@@ -13,6 +13,18 @@ from .base import Analyzer
 ORG_NAME = "SAHEL GENERAL HOSPITAL"
 PRODUCT_NAME = "Excel Intelligence Agent"
 
+_MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _fmt_period(period: str) -> str:
+    """'2026-01' -> 'Jan-26' to match the PivotTables' month/year grouping."""
+    try:
+        y, m = period.split("-")
+        return f"{_MONTHS[int(m)]}-{y[2:]}"
+    except Exception:
+        return period
+
 
 class DashboardAnalyzer(Analyzer):
     key = "dashboard"
@@ -20,11 +32,11 @@ class DashboardAnalyzer(Analyzer):
 
     def applies_to(self, profile: WorkbookProfile) -> bool:
         t = profile.primary
-        return bool(t and t.measures and t.row_count > 0)
+        return bool(t and t.key_measures and t.row_count > 0)
 
     def run(self, profile: WorkbookProfile) -> Optional[SheetSpec]:
         table = profile.primary
-        if table is None or not table.measures:
+        if table is None or not table.key_measures:
             return None
 
         spec = SheetSpec(
@@ -46,13 +58,13 @@ class DashboardAnalyzer(Analyzer):
 
         # Headline KPI tiles.
         spec.kpi_tiles.append(KpiTile("Records", f"{table.row_count:,}"))
-        for m in table.measures[:3]:
+        for m in table.key_measures[:3]:
             spec.kpi_tiles.append(KpiTile(
                 f"Total {m.name}", fmt_measure(m, m.total or 0.0),
                 caption=f"avg {fmt_measure(m, m.mean or 0.0)}",
             ))
 
-        measure = table.measures[0]
+        measure = table.primary_value_measure or table.key_measures[0]
 
         # Chart 1: top categories (bar) for the leading dimension.
         if table.dimensions:
@@ -73,7 +85,7 @@ class DashboardAnalyzer(Analyzer):
                 spec.charts.append(ChartSpec(
                     kind=ChartKind.LINE,
                     title=f"{measure.name} over time",
-                    categories=[p for p, _ in series],
+                    categories=[_fmt_period(p) for p, _ in series],
                     series_name=measure.name,
                     values=[round(v, 2) for _, v in series],
                 ))

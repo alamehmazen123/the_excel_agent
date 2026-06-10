@@ -84,11 +84,19 @@ def _extract_table(ws) -> Optional[TableProfile]:
     names = _dedupe_headers(raw_headers, min_col)
 
     rows: list[dict[str, Any]] = []
+    # Capture the number format of each column from the first data cell that has one.
+    fmt_by_name: dict[str, str] = {}
     last_data_row = header_row
     for r in range(header_row + 1, max_row + 1):
-        values = [ws.cell(row=r, column=c).value for c in range(min_col, max_col + 1)]
+        cells = [ws.cell(row=r, column=c) for c in range(min_col, max_col + 1)]
+        values = [c.value for c in cells]
         if all(_cell_is_empty(v) for v in values):
             continue
+        for i, cell in enumerate(cells):
+            nm = names[i]
+            if nm not in fmt_by_name and not _cell_is_empty(cell.value):
+                fmt = getattr(cell, "number_format", "General") or "General"
+                fmt_by_name[nm] = fmt
         rows.append({names[i]: values[i] for i in range(len(names))})
         last_data_row = r
 
@@ -100,7 +108,7 @@ def _extract_table(ws) -> Optional[TableProfile]:
         first_data_row=header_row + 1, last_data_row=last_data_row,
         first_col=min_col, last_col=max_col, rows=rows,
     )
-    profile_table(table)
+    profile_table(table, fmt_by_name)   # formats drive currency/percent detection
     return table
 
 

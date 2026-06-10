@@ -41,7 +41,7 @@ class ExecutiveSummaryAnalyzer(Analyzer):
             "measures": [],
             "top_breakdowns": [],
         }
-        for m in table.measures[:5]:
+        for m in table.key_measures[:5]:
             entry = {
                 "name": m.name, "total": round(m.total or 0, 2),
                 "average": round(m.mean or 0, 2),
@@ -54,8 +54,9 @@ class ExecutiveSummaryAnalyzer(Analyzer):
                     entry["period_growth_pct"] = round(growth * 100, 1)
             metrics["measures"].append(entry)
 
-        if table.dimensions and table.measures:
-            dim, measure = table.dimensions[0], table.measures[0]
+        measure = table.primary_value_measure
+        if table.dimensions and measure is not None:
+            dim = table.dimensions[0]
             ranked = group_sum(table, dim, measure, top_n=5)
             metrics["top_breakdowns"].append({
                 "dimension": dim.name, "measure": measure.name,
@@ -70,7 +71,7 @@ class ExecutiveSummaryAnalyzer(Analyzer):
             f"This report analyzes {metrics['record_count']:,} records across "
             f"{metrics['column_count']} fields from the '{metrics['source_sheet']}' sheet."
         ]
-        for m, col in zip(metrics["measures"], table.measures):
+        for m, col in zip(metrics["measures"], table.key_measures):
             line = (f"{m['name']}: total {fmt_measure(col, m['total'])}, "
                     f"averaging {fmt_measure(col, m['average'])} per record "
                     f"(range {fmt_measure(col, m['min'])}–{fmt_measure(col, m['max'])}).")
@@ -94,6 +95,38 @@ class ExecutiveSummaryAnalyzer(Analyzer):
         )
         return paras
 
+    def _highlights(self, profile: WorkbookProfile,
+                    metrics: dict[str, Any]) -> list[str]:
+        table = profile.primary
+        lines = [f"Records analyzed: {metrics['record_count']:,}  "
+                 f"across {metrics['column_count']} fields."]
+        for m, col in zip(metrics["measures"], table.key_measures):
+            line = (f"{m['name']} — Total {fmt_measure(col, m['total'])}, "
+                    f"Average {fmt_measure(col, m['average'])}, "
+                    f"Max {fmt_measure(col, m['max'])}.")
+            if "period_growth_pct" in m:
+                g = m["period_growth_pct"] / 100
+                arrow = "▲" if g >= 0 else "▼"
+                line += f"  {arrow} {fmt_percent(abs(g))} vs prior period."
+            lines.append(line)
+        return lines
+
+    def _recommendations(self, profile: WorkbookProfile,
+                         metrics: dict[str, Any]) -> list[str]:
+        recs: list[str] = []
+        for b in metrics["top_breakdowns"]:
+            if b["items"]:
+                top = b["items"][0]
+                recs.append(f"Focus on the leading {b['dimension']} "
+                            f"('{top['label']}') — it drives the most {b['measure']}.")
+        for m in metrics["measures"]:
+            if m.get("period_growth_pct", 0) < 0:
+                recs.append(f"Investigate the decline in {m['name']} "
+                            f"({m['period_growth_pct']}% vs prior period).")
+        recs.append("Review the Dashboard and Pivot Analysis sheets for the full "
+                    "breakdown before the next planning cycle.")
+        return recs[:4]
+
     def run(self, profile: WorkbookProfile) -> Optional[SheetSpec]:
         if profile.primary is None:
             return None
@@ -111,17 +144,26 @@ class ExecutiveSummaryAnalyzer(Analyzer):
             subheading=f"Source: {metrics['source_sheet']}  •  {metrics['record_count']:,} records",
         )
 
+        # Overview (AI narrative when available, else a deterministic template).
         if narrative:
             self.used_llm = True
             paragraphs = [p.strip() for p in narrative.split("\n") if p.strip()]
-            spec.text_blocks.append(TextBlock(title="Overview", paragraphs=paragraphs))
         else:
             self.used_llm = False
             self.note = ("AI narrative unavailable — summary generated from "
                          "computed metrics.")
-            spec.text_blocks.append(TextBlock(
-                title="Overview",
-                paragraphs=self._template_narrative(profile, metrics),
-            ))
+            paragraphs = self._template_narrative(profile, metrics)
+        spec.text_blocks.append(TextBlock(title="Overview", paragraphs=paragraphs,
+                                          style="normal"))
+
+        # Key highlights (bold navy) and an appealing Recommendations block (red).
+        spec.text_blocks.append(TextBlock(
+            title="Key Highlights", style="highlight",
+            paragraphs=self._highlights(profile, metrics)))
+        spec.text_blocks.append(TextBlock(
+            title="Recommendations", style="recommend",
+            paragraphs=self._recommendations(profile, metrics)))
+
+        if self.note:
             spec.text_blocks.append(TextBlock(title="Note", paragraphs=[self.note]))
         return spec

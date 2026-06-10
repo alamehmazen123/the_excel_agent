@@ -25,25 +25,76 @@ def _is_date(v: Any) -> bool:
     return isinstance(v, (_dt.date, _dt.datetime))
 
 
-def _looks_like_percent(name: str, values: list[Any]) -> bool:
-    if "%" in name or "percent" in name.lower() or "rate" in name.lower():
-        nums = [v for v in values if _is_number(v)]
-        if nums and all(-1.5 <= v <= 1.5 for v in nums):
-            return True
-        if "%" in name or "percent" in name.lower():
-            return True
-    return False
+_CURRENCY_SYMBOLS = ("$", "€", "£", "¥", "₹", "₽", "[$")
+
+
+def _format_is_currency(fmt: str) -> bool:
+    f = fmt or ""
+    return any(sym in f for sym in _CURRENCY_SYMBOLS)
+
+
+def _format_is_percent(fmt: str) -> bool:
+    return "%" in (fmt or "")
+
+
+def _looks_like_percent(name: str) -> bool:
+    n = name.lower()
+    return "%" in n or "percent" in n or "pct" in n or n.endswith(" rate")
 
 
 def _looks_like_currency(name: str) -> bool:
+    # Header HINTS only -- the cell number format is the stronger signal.
     n = name.lower()
     keys = ("price", "cost", "revenue", "sales", "amount", "total", "$",
-            "usd", "eur", "gbp", "income", "expense", "profit", "budget", "spend")
+            "usd", "usdt", "eur", "gbp", "pnl", "income", "expense", "profit",
+            "budget", "spend", "balance", "fee", "pay", "salary", "wage",
+            "value", "deposit", "withdraw", "charge", "premium")
     return any(k in n for k in keys)
 
 
-def profile_column(name: str, index: int, values: list[Any]) -> ColumnProfile:
-    """Infer the type and compute statistics for a single column."""
+_ID_TOKENS = {"id", "no", "no.", "#", "index", "idx", "serial", "seq",
+              "sequence", "row", "rownum", "s/n", "sn", "sr", "sr.", "key"}
+
+
+def _looks_like_identifier(name: str, is_first: bool, all_integer: bool,
+                           distinct: int, count: int, is_currency_fmt: bool,
+                           value_keyword: bool) -> bool:
+    """A numeric row id / code column that must never be treated as a value.
+
+    Works on ANY workbook: an integer column that is (near-)unique and isn't
+    money-formatted or value-named is almost certainly an identifier/code.
+    """
+    if not all_integer or count == 0:
+        return False
+    if is_currency_fmt or value_keyword:
+        return False
+    n = name.strip().lower()
+    header_id = (
+        n in _ID_TOKENS
+        or n.endswith(" id") or n.endswith("_id") or n.startswith("id ")
+        or "id" in n.split() or "number" in n.split() or n == "number"
+        or n.endswith(" no") or n.endswith(" #") or n.endswith("code")
+    )
+    unique_ratio = distinct / count
+    if header_id:
+        return True
+    # First column of unique integers -> a row number.
+    if is_first and unique_ratio > 0.9:
+        return True
+    # Any (near-)unique integer column with no value meaning -> a code/id.
+    if unique_ratio > 0.98 and distinct >= 10:
+        return True
+    return False
+
+
+def profile_column(name: str, index: int, values: list[Any],
+                   number_format: str = "General") -> ColumnProfile:
+    """Infer the type and statistics for a single column.
+
+    The cell ``number_format`` is used as the PRIMARY signal for currency /
+    percent (data-driven), with header keywords as a fallback hint -- so the
+    agent self-identifies value columns on workbooks with any header names.
+    """
     non_null = [v for v in values if v is not None and v != ""]
     count = len(non_null)
     nulls = len(values) - count
@@ -51,7 +102,7 @@ def profile_column(name: str, index: int, values: list[Any]) -> ColumnProfile:
 
     prof = ColumnProfile(
         name=str(name), index=index, ctype=ColumnType.EMPTY,
-        count=count, nulls=nulls, distinct=distinct,
+        count=count, nulls=nulls, distinct=distinct, number_format=number_format,
     )
     if count == 0:
         return prof
@@ -60,6 +111,9 @@ def profile_column(name: str, index: int, values: list[Any]) -> ColumnProfile:
     n_dates = sum(1 for v in non_null if _is_date(v))
     frac_numeric = n_numbers / count
     frac_date = n_dates / count
+
+    fmt_currency = _format_is_currency(number_format)
+    fmt_percent = _format_is_percent(number_format)
 
     if frac_date >= 0.8:
         prof.ctype = ColumnType.DATE
@@ -70,9 +124,14 @@ def profile_column(name: str, index: int, values: list[Any]) -> ColumnProfile:
         prof.maximum = max(nums)
         prof.total = sum(nums)
         prof.mean = prof.total / len(nums)
-        if _looks_like_percent(name, non_null):
+        all_integer = all(float(v).is_integer() for v in nums)
+        value_kw = _looks_like_currency(name)
+        if _looks_like_identifier(name, index == 0, all_integer, distinct,
+                                  count, fmt_currency, value_kw):
+            prof.ctype = ColumnType.IDENTIFIER
+        elif fmt_percent or _looks_like_percent(name):
             prof.ctype = ColumnType.PERCENT
-        elif _looks_like_currency(name):
+        elif fmt_currency or value_kw:
             prof.ctype = ColumnType.CURRENCY
         else:
             prof.ctype = ColumnType.NUMERIC
@@ -87,11 +146,13 @@ def profile_column(name: str, index: int, values: list[Any]) -> ColumnProfile:
     return prof
 
 
-def profile_table(table: TableProfile) -> None:
+def profile_table(table: TableProfile, formats: dict[str, str] | None = None) -> None:
     """Populate ``table.columns`` in place from its ``rows``."""
     if not table.rows:
         return
+    formats = formats or {}
     names = list(table.rows[0].keys())
     for idx, name in enumerate(names):
         col_values = [row.get(name) for row in table.rows]
-        table.columns.append(profile_column(name, idx, col_values))
+        table.columns.append(
+            profile_column(name, idx, col_values, formats.get(name, "General")))
