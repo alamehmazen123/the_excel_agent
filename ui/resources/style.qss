@@ -1,0 +1,99 @@
+/* Excel Intelligence Agent - modern professional theme */
+
+QWidget {
+    background-color: #F4F6FB;
+    color: #1F2937;
+    font-family: "Segoe UI", Calibri, sans-serif;
+    font-size: 14px;
+}
+
+QFrame#Card {
+    background-color: #FFFFFF;
+    border: 1px solid #E3E8F0;
+    border-radius: 12px;
+}
+
+QLabel#TitleLabel {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1F3864;
+}
+
+QLabel#SubtitleLabel {
+    font-size: 13px;
+    color: #6B7280;
+}
+
+QLabel#SectionLabel {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1F3864;
+    text-transform: uppercase;
+}
+
+QLabel#FileLabel {
+    color: #374151;
+    font-size: 14px;
+    padding: 6px 0;
+}
+
+/* Primary action button */
+QPushButton#PrimaryButton {
+    background-color: #2E5496;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: 600;
+}
+QPushButton#PrimaryButton:hover { background-color: #25457D; }
+QPushButton#PrimaryButton:pressed { background-color: #1F3864; }
+QPushButton#PrimaryButton:disabled { background-color: #A9B6CC; color: #EEF1F7; }
+
+/* Secondary buttons */
+QPushButton {
+    background-color: #FFFFFF;
+    color: #1F3864;
+    border: 1px solid #C3CEE3;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+}
+QPushButton:hover { background-color: #EEF2FB; }
+QPushButton:pressed { background-color: #E0E7F6; }
+QPushButton:disabled { color: #A9B6CC; border-color: #E3E8F0; }
+
+QCheckBox { spacing: 10px; padding: 6px 0; font-size: 14px; }
+QCheckBox::indicator {
+    width: 20px; height: 20px;
+    border: 2px solid #C3CEE3; border-radius: 5px; background: #FFFFFF;
+}
+QCheckBox::indicator:checked {
+    background-color: #2E5496; border-color: #2E5496;
+}
+QCheckBox:disabled { color: #AEB7C7; }
+
+QProgressBar {
+    border: none; border-radius: 7px; background-color: #E3E8F0;
+    height: 14px; text-align: center; color: #1F3864; font-size: 11px;
+}
+QProgressBar::chunk { background-color: #2E5496; border-radius: 7px; }
+
+QLineEdit, QComboBox {
+    background: #FFFFFF; border: 1px solid #C3CEE3; border-radius: 8px;
+    padding: 9px 12px; font-size: 14px;
+}
+QLineEdit:focus, QComboBox:focus { border-color: #2E5496; }
+
+QLabel#StatusLabel { color: #6B7280; font-size: 13px; }
+QLabel#FooterLabel { color: #9AA3B2; font-size: 11px; }
+
+QPushButton#ClearButton {
+    background-color: #FFFFFF; color: #C62828;
+    border: 1px solid #E3B0B0; border-radius: 17px;
+    font-size: 15px; font-weight: 700; padding: 0;
+}
+QPushButton#ClearButton:hover { background-color: #FBE9E9; border-color: #C62828; }
+QPushButton#ClearButton:pressed { background-color: #F4D0D0; }

@@ -1,0 +1,263 @@
+222 INFO: PyInstaller: 6.20.0, contrib hooks: 2026.6
+222 INFO: Python: 3.11.9
+237 INFO: Platform: Windows-10-10.0.19045-SP0
+237 INFO: Python environment: C:\Users\DR MAZEN\AppData\Local\Programs\Python\Python311
+243 INFO: Removing temporary files and cleaning cache in C:\Users\DR MAZEN\AppData\Local\pyinstaller
+1526 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\DR MAZEN\\Desktop\\the_excel_agent',
+ 'C:\\Users\\DR '
+ 'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\python311.zip',
+ 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\DLLs',
+ 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib',
+ 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311',
+ 'C:\\Users\\DR MAZEN\\AppData\\Roaming\\Python\\Python311\\site-packages',
+ 'C:\\Users\\DR '
+ 'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages',
+ 'C:\\Users\\DR '
+ 'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32',
+ 'C:\\Users\\DR '
+ 'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\DR '
+ 'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\Pythonwin',
+ 'C:\\Users\\DR MAZEN\\Desktop\\the_excel_agent']
+2255 INFO: Appending 'datas' from .spec
+2255 INFO: checking Analysis
+2256 INFO: Building Analysis because Analysis-00.toc is non existent
+2256 INFO: Looking for Python shared library...
+2256 INFO: Using Python shared library: C:\Users\DR MAZEN\AppData\Local\Programs\Python\Python311\python311.dll
+2256 INFO: Running Analysis Analysis-00.toc
+2256 INFO: Target bytecode optimization level: 0
+2256 INFO: Initializing module dependency graph...
+2259 INFO: Initializing module graph hook caches...
+2295 INFO: Analyzing modules for base_library.zip ...
+3768 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+3854 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+5864 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+7389 INFO: Caching module dependency graph...
+7477 INFO: Analyzing C:\Users\DR MAZEN\Desktop\the_excel_agent\main.py
+7491 INFO: Processing standard module hook 'hook-PySide6.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+7831 INFO: Processing standard module hook 'hook-shiboken6.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+8014 INFO: Processing standard module hook 'hook-PySide6.QtNetwork.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+10451 INFO: Processing standard module hook 'hook-PySide6.QtCore.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+13528 INFO: Processing standard module hook 'hook-PySide6.QtGui.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+27603 INFO: Processing standard module hook 'hook-PySide6.QtWidgets.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+31036 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+31200 INFO: Processing standard module hook 'hook-win32com.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+31203 INFO: Processing standard module hook 'hook-pythoncom.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+31359 INFO: Processing standard module hook 'hook-pywintypes.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+32096 INFO: Processing standard module hook 'hook-openpyxl.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+32764 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+33478 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+33726 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+33890 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+34160 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+34990 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+35073 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+37096 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+37098 INFO: SetuptoolsInfo: initializing cached setuptools info...
+39023 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+39396 INFO: Processing standard module hook 'hook-lxml.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+39980 INFO: Processing standard module hook 'hook-lxml.etree.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+40006 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+40084 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+40889 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+41027 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+41904 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+42887 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+45646 INFO: Processing standard module hook 'hook-cryptography.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+47308 INFO: hook-cryptography: cryptography does not seem to be using dynamically linked OpenSSL.
+47339 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+47528 INFO: Processing standard module hook 'hook-keyring.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+48456 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48459 INFO: Processing pre-safe-import-module hook 'hook-jaraco.context.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48470 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48473 INFO: Processing pre-safe-import-module hook 'hook-backports.tarfile.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48556 INFO: Processing standard module hook 'hook-backports.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+48564 INFO: Processing pre-safe-import-module hook 'hook-jaraco.functools.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48578 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48757 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48783 INFO: Processing standard module hook 'hook-importlib_metadata.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+48810 INFO: Processing pre-safe-import-module hook 'hook-zipp.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+48860 INFO: Analyzing hidden import 'keyring.__main__'
+48876 INFO: Analyzing hidden import 'keyring.backends.SecretService'
+48883 INFO: Analyzing hidden import 'keyring.backends.Windows'
+48901 INFO: Processing standard module hook 'hook-win32ctypes.core.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+50369 INFO: Processing standard module hook 'hook-pycparser.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+50822 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+50832 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+50833 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+52827 INFO: Processing standard module hook 'hook-distutils.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+52886 INFO: Processing standard module hook 'hook-distutils.util.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+52921 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+53132 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+55542 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+56397 INFO: Analyzing hidden import 'keyring.backends.chainer'
+56400 INFO: Analyzing hidden import 'keyring.backends.kwallet'
+56407 INFO: Analyzing hidden import 'keyring.backends.libsecret'
+56412 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+56415 INFO: Analyzing hidden import 'keyring.backends.macOS'
+56425 INFO: Analyzing hidden import 'keyring.backends.null'
+56427 INFO: Analyzing hidden import 'keyring.devpi_client'
+56506 INFO: Analyzing hidden import 'keyring.http'
+56508 INFO: Analyzing hidden import 'keyring.testing'
+56509 INFO: Analyzing hidden import 'keyring.testing.backend'
+56522 INFO: Analyzing hidden import 'win32com.adsi'
+56528 INFO: Analyzing hidden import 'win32com.adsi.adsicon'
+56535 INFO: Analyzing hidden import 'win32com.authorization'
+56536 INFO: Analyzing hidden import 'win32com.authorization.authorization'
+56538 INFO: Analyzing hidden import 'win32com.axcontrol'
+56539 INFO: Analyzing hidden import 'win32com.axcontrol.axcontrol'
+56541 INFO: Analyzing hidden import 'win32com.axdebug'
+56542 INFO: Analyzing hidden import 'win32com.axdebug.adb'
+56662 INFO: Analyzing hidden import 'win32com.axdebug.codecontainer'
+56677 INFO: Analyzing hidden import 'win32com.axdebug.debugger'
+56688 INFO: Analyzing hidden import 'win32com.axdebug.dump'
+56691 INFO: Analyzing hidden import 'win32com.axscript'
+56692 INFO: Analyzing hidden import 'win32com.axscript.asputil'
+56694 INFO: Analyzing hidden import 'win32com.axscript.axscript'
+56694 INFO: Analyzing hidden import 'win32com.axscript.client'
+56695 INFO: Analyzing hidden import 'win32com.axscript.client.debug'
+56703 INFO: Analyzing hidden import 'win32com.axscript.client.error'
+56847 INFO: Analyzing hidden import 'win32com.axscript.client.framework'
+56878 INFO: Analyzing hidden import 'win32com.axscript.client.pydumper'
+56988 INFO: Analyzing hidden import 'win32com.axscript.client.pyscript_rexec'
+56990 INFO: Analyzing hidden import 'win32com.axscript.server'
+56990 INFO: Analyzing hidden import 'win32com.axscript.server.axsite'
+56995 INFO: Analyzing hidden import 'win32com.bits'
+56996 INFO: Analyzing hidden import 'win32com.bits.bits'
+56998 INFO: Analyzing hidden import 'win32com.client.combrowse'
+57075 INFO: Analyzing hidden import 'win32com.client.tlbrowse'
+57090 INFO: Analyzing hidden import 'win32com.demos'
+57091 INFO: Analyzing hidden import 'win32com.demos.connect'
+57097 INFO: Analyzing hidden import 'win32com.demos.dump_clipboard'
+57103 INFO: Analyzing hidden import 'win32com.demos.eventsApartmentThreaded'
+57107 INFO: Analyzing hidden import 'win32com.demos.eventsFreeThreaded'
+57110 INFO: Analyzing hidden import 'win32com.demos.excelAddin'
+57117 INFO: Analyzing hidden import 'win32com.demos.excelRTDServer'
+57126 INFO: Analyzing hidden import 'win32com.demos.iebutton'
+57134 INFO: Analyzing hidden import 'win32com.demos.ietoolbar'
+57149 INFO: Analyzing hidden import 'win32com.demos.outlookAddin'
+57155 INFO: Analyzing hidden import 'win32com.demos.trybag'
+57161 INFO: Analyzing hidden import 'win32com.directsound'
+57162 INFO: Analyzing hidden import 'win32com.directsound.directsound'
+57164 INFO: Analyzing hidden import 'win32com.directsound.test'
+57165 INFO: Analyzing hidden import 'win32com.directsound.test.ds_record'
+57170 INFO: Analyzing hidden import 'win32com.directsound.test.ds_test'
+57201 INFO: Analyzing hidden import 'win32com.ifilter'
+57202 INFO: Analyzing hidden import 'win32com.ifilter.ifilter'
+57204 INFO: Analyzing hidden import 'win32com.ifilter.ifiltercon'
+57207 INFO: Analyzing hidden import 'win32com.internet'
+57208 INFO: Analyzing hidden import 'win32com.internet.inetcon'
+57215 INFO: Analyzing hidden import 'win32com.internet.internet'
+57215 INFO: Analyzing hidden import 'win32com.makegw'
+57216 INFO: Analyzing hidden import 'win32com.makegw.makegw'
+57261 INFO: Analyzing hidden import 'win32com.mapi'
+57265 INFO: Analyzing hidden import 'win32com.mapi.emsabtags'
+57361 INFO: Analyzing hidden import 'win32com.mapi.exchange'
+57362 INFO: Analyzing hidden import 'win32com.mapi.mapi'
+57363 INFO: Analyzing hidden import 'win32com.mapi.mapiutil'
+57370 INFO: Analyzing hidden import 'win32com.propsys'
+57372 INFO: Analyzing hidden import 'win32com.propsys.propsys'
+57374 INFO: Analyzing hidden import 'win32com.propsys.pscon'
+57460 INFO: Analyzing hidden import 'win32com.server.factory'
+57462 INFO: Analyzing hidden import 'win32com.server.localserver'
+57464 INFO: Analyzing hidden import 'win32com.servers'
+57465 INFO: Analyzing hidden import 'win32com.servers.PythonTools'
+57468 INFO: Analyzing hidden import 'win32com.servers.dictionary'
+57473 INFO: Analyzing hidden import 'win32com.servers.interp'
+57475 INFO: Analyzing hidden import 'win32com.servers.perfmon'
+57484 INFO: Analyzing hidden import 'win32com.servers.test_pycomtest'
+57491 INFO: Analyzing hidden import 'win32com.storagecon'
+57493 INFO: Analyzing hidden import 'win32com.taskscheduler'
+57495 INFO: Analyzing hidden import 'win32com.taskscheduler.taskscheduler'
+57496 INFO: Analyzing hidden import 'win32com.test'
+57497 INFO: Analyzing hidden import 'win32com.test.GenTestScripts'
+57502 INFO: Analyzing hidden import 'win32com.test.daodump'
+57506 INFO: Analyzing hidden import 'win32com.test.errorSemantics'
+57524 INFO: Analyzing hidden import 'win32com.test.pippo_server'
+57528 INFO: Analyzing hidden import 'win32com.test.policySemantics'
+57532 INFO: Analyzing hidden import 'win32com.test.testADOEvents'
+57541 INFO: Analyzing hidden import 'win32com.test.testAXScript'
+57543 INFO: Analyzing hidden import 'win32com.test.testArrays'
+57548 INFO: Analyzing hidden import 'win32com.test.testClipboard'
+57555 INFO: Analyzing hidden import 'win32com.test.testCollections'
+57561 INFO: Analyzing hidden import 'win32com.test.testConversionErrors'
+57563 INFO: Analyzing hidden import 'win32com.test.testDCOM'
+57564 INFO: Analyzing hidden import 'win32com.test.testDates'
+57590 INFO: Analyzing hidden import 'win32com.test.testDictionary'
+57594 INFO: Analyzing hidden import 'win32com.test.testDynamic'
+57598 INFO: Analyzing hidden import 'win32com.test.testExchange'
+57602 INFO: Analyzing hidden import 'win32com.test.testExplorer'
+57606 INFO: Analyzing hidden import 'win32com.test.testGIT'
+57610 INFO: Analyzing hidden import 'win32com.test.testGatewayAddresses'
+57615 INFO: Analyzing hidden import 'win32com.test.testIterators'
+57621 INFO: Analyzing hidden import 'win32com.test.testMSOffice'
+57629 INFO: Analyzing hidden import 'win32com.test.testMSOfficeEvents'
+57634 INFO: Analyzing hidden import 'win32com.test.testMarshal'
+57641 INFO: Analyzing hidden import 'win32com.test.testPersist'
+57648 INFO: Analyzing hidden import 'win32com.test.testPippo'
+57652 INFO: Analyzing hidden import 'win32com.test.testPyComTest'
+57689 INFO: Analyzing hidden import 'win32com.test.testROT'
+57691 INFO: Analyzing hidden import 'win32com.test.testShell'
+57701 INFO: Analyzing hidden import 'win32com.test.testStorage'
+57704 INFO: Analyzing hidden import 'win32com.test.testStreams'
+57709 INFO: Analyzing hidden import 'win32com.test.testWMI'
+57711 INFO: Analyzing hidden import 'win32com.test.testall'
+57720 INFO: Analyzing hidden import 'win32com.test.testmakepy'
+57723 INFO: Analyzing hidden import 'win32com.test.testvb'
+57740 INFO: Analyzing hidden import 'win32com.test.testvbscript_regexp'
+57742 INFO: Analyzing hidden import 'win32com.test.testxslt'
+57744 INFO: Processing module hooks (post-graph stage)...
+58480 INFO: Processing standard module hook 'hook-lxml.isoschematron.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+58521 WARNING: Hidden import "pycparser.lextab" not found!
+58522 WARNING: Hidden import "pycparser.yacctab" not found!
+59456 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+60397 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+61245 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+61390 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+62501 INFO: Processing standard module hook 'hook-lxml.objectify.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+62519 INFO: Performing binary vs. data reclassification (160 entries)
+62597 INFO: Looking for ctypes DLLs
+62883 INFO: Analyzing run-time hooks ...
+62890 INFO: Including run-time hook 'pyi_rth_pywintypes.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+62891 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+62894 INFO: Including run-time hook 'pyi_rth_pythoncom.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+62895 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+62898 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+62901 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+62902 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+62907 INFO: Including run-time hook 'pyi_rth_cryptography_openssl.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+62908 INFO: Including run-time hook 'pyi_rth_pyside6.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+62910 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+62913 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+62945 INFO: Creating base_library.zip...
+62979 INFO: Looking for dynamic libraries
+66938 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\shiboken6', 'C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\numpy.libs']
+66938 INFO: Extra DLL search directories (PATH): ['C:\\Users\\DR MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PySide6']
+71569 INFO: Warnings written to C:\Users\DR MAZEN\Desktop\the_excel_agent\build\build\warn-build.txt
+71883 INFO: Graph cross-reference written to C:\Users\DR MAZEN\Desktop\the_excel_agent\build\build\xref-build.html
+71990 INFO: checking PYZ
+71990 INFO: Building PYZ because PYZ-00.toc is non existent
+71990 INFO: Building PYZ (ZlibArchive) C:\Users\DR MAZEN\Desktop\the_excel_agent\build\build\PYZ-00.pyz
+73722 INFO: Building PYZ (ZlibArchive) C:\Users\DR MAZEN\Desktop\the_excel_agent\build\build\PYZ-00.pyz completed successfully.
+73805 INFO: checking PKG
+73806 INFO: Building PKG because PKG-00.toc is non existent
+73806 INFO: Building PKG (CArchive) ExcelIntelligenceAgent.pkg
+73859 INFO: Building PKG (CArchive) ExcelIntelligenceAgent.pkg completed successfully.
+73861 INFO: Bootloader C:\Users\DR MAZEN\AppData\Local\Programs\Python\Python311\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+73861 INFO: checking EXE
+73861 INFO: Building EXE because EXE-00.toc is non existent
+73861 INFO: Building EXE from EXE-00.toc
+73861 INFO: Copying bootloader EXE to C:\Users\DR MAZEN\Desktop\the_excel_agent\build\build\ExcelIntelligenceAgent.exe
+73917 INFO: Copying icon to EXE
+73965 INFO: Copying 0 resources to EXE
+73965 INFO: Embedding manifest in EXE
+74036 INFO: Appending PKG archive to EXE
+74139 INFO: Fixing EXE headers
+75565 INFO: Building EXE from EXE-00.toc completed successfully.
+75568 INFO: checking COLLECT
+75569 INFO: Building COLLECT because COLLECT-00.toc is non existent
+75569 INFO: Building COLLECT COLLECT-00.toc
+80155 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+80164 INFO: Build complete! The results are available in: C:\Users\DR MAZEN\Desktop\the_excel_agent\dist
+PYI_RC=0
