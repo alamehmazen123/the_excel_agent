@@ -13,6 +13,16 @@ QFrame#Card {
     border-radius: 12px;
 }
 
+QLabel#OrgLabel {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0070C0;
+    letter-spacing: 1px;
+    padding: 2px 0 8px 0;
+    border-bottom: 2px solid #E3E8F0;
+    margin-bottom: 6px;
+}
+
 QLabel#TitleLabel {
     font-size: 22px;
     font-weight: 700;

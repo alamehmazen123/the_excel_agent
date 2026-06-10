@@ -41,7 +41,9 @@ class GroqNarrator:
                 {"role": "user", "content": build_user_prompt(metrics)},
             ],
             "temperature": 0.4,
-            "max_tokens": 900,
+            "max_tokens": 1600,
+            # Ask for a strict JSON object so the briefing parses reliably.
+            "response_format": {"type": "json_object"},
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",

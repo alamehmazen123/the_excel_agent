@@ -10,7 +10,8 @@ from __future__ import annotations
 import base64
 
 APP_NAME = "Excel Intelligence Agent"
-APP_VERSION = "1.3.0"          # <-- bump this for every release (1.0.1, 1.1.0, ...)
+ORG_NAME = "SAHEL GENERAL HOSPITAL"   # shown in the app window header
+APP_VERSION = "1.7.0"          # <-- bump this for every release (1.0.1, 1.1.0, ...)
 EXE_NAME = "ExcelIntelligenceAgent"
 
 # BUILD_DATE is stamped automatically at build time by tools/stamp_build.py.
@@ -48,23 +49,31 @@ OUTPUT_SHEETS = {
     "summary": "Executive Summary",
 }
 
-# Bundled default Groq key. You can paste either:
-#   - the raw key as-is:           "gsk_xxxxxxxx"
-#   - or a base64-obfuscated key:  base64.b64encode(b"gsk_xxxx").decode()
-# Empty by default. NOTE: a bundled key can be extracted from the .exe and is
-# shared by everyone you distribute to (same free-tier rate limit).
-_BUNDLED_GROQ_KEY_B64 = "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"
+# Bundled default Groq key. The key is NOT stored in this file (so it can be
+# committed to a public repo). It is read from, in order:
+#   1. local_secrets.py  (GROQ_API_KEY)  -- gitignored; bundled into the exe
+#   2. the GROQ_API_KEY environment variable
+# Each value may be a raw 'gsk_...' key or a base64-obfuscated blob.
+# (Per-user keys entered in the app's Settings always take precedence at runtime.)
+def _raw_bundled_key() -> str:
+    try:
+        import local_secrets  # noqa: PLC0415 -- gitignored, optional
+        k = (getattr(local_secrets, "GROQ_API_KEY", "") or "").strip()
+        if k:
+            return k
+    except Exception:
+        pass
+    import os  # noqa: PLC0415
+    return (os.environ.get("GROQ_API_KEY", "") or "").strip()
 
 
 def bundled_groq_key() -> str:
     """Return the bundled key. Accepts a raw 'gsk_' key or a base64 blob."""
-    raw = (_BUNDLED_GROQ_KEY_B64 or "").strip()
+    raw = _raw_bundled_key()
     if not raw:
         return ""
-    # If it already looks like a real Groq key, use it directly.
     if raw.startswith("gsk_"):
         return raw
-    # Otherwise treat it as base64-obfuscated.
     try:
         return base64.b64decode(raw.encode()).decode()
     except Exception:
