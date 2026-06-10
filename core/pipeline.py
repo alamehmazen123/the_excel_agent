@@ -12,9 +12,10 @@ from .analyzers.dashboard import DashboardAnalyzer
 from .analyzers.executive_summary import ExecutiveSummaryAnalyzer, Narrator
 from .analyzers.kpi import KpiAnalyzer
 from .analyzers.pivot import PivotAnalyzer
-from .constants import SHEET_PIVOT
+from .constants import SHEET_KPI, SHEET_PIVOT
 from .excel_com import ExcelFinalizer, excel_available
 from .loader import load_workbook_profile
+from .pivot_plan import build_pivot_plan
 from .models import (AnalysisOptions, AnalysisResult, ProgressCallback,
                      WorkbookProfile, _noop_progress)
 from .writer import write_results
@@ -47,7 +48,7 @@ class Engine:
 
         progress(0.20, "Detecting tables and column types…")
         use_com = excel_available()
-        analyzers = self._selected_analyzers(options)
+        analyzers = self._selected_analyzers(options, use_com)
 
         specs = []
         summary_analyzer: Optional[ExecutiveSummaryAnalyzer] = None
@@ -84,9 +85,14 @@ class Engine:
 
         if use_com:
             progress(0.86, "Building active pivot tables in Excel…")
+            # Build the pivot plan, keeping only pivots whose target sheet exists.
+            plan = build_pivot_plan(profile)
+            plan = [p for p in plan
+                    if (p.target_sheet == SHEET_PIVOT and options.pivot)
+                    or (p.target_sheet == SHEET_KPI and options.kpi)]
             finalizer = ExcelFinalizer()
             try:
-                finalizer.finalize(workbook_path, profile, build_pivots=options.pivot)
+                finalizer.finalize(workbook_path, profile, plan)
                 if options.pivot and SHEET_PIVOT not in created:
                     created.append(SHEET_PIVOT)
                 result.notes.extend(finalizer.notes)
@@ -116,10 +122,13 @@ class Engine:
             ExecutiveSummaryAnalyzer(self._narrator),
         ]
 
-    def _selected_analyzers(self, options: AnalysisOptions) -> list[Analyzer]:
+    def _selected_analyzers(self, options: AnalysisOptions,
+                            use_com: bool = False) -> list[Analyzer]:
         chosen: list[Analyzer] = []
         if options.kpi:
-            chosen.append(KpiAnalyzer())
+            # With Excel, KPI stats/date tables become real pivots (built by the
+            # COM finalizer), so the KPI sheet only needs its headline tiles.
+            chosen.append(KpiAnalyzer(include_tables=not use_com))
         if options.pivot:
             chosen.append(PivotAnalyzer())
         if options.dashboard:

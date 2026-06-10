@@ -15,9 +15,14 @@ class KpiAnalyzer(Analyzer):
     key = "kpi"
     sheet_name = SHEET_KPI
 
+    def __init__(self, include_tables: bool = True) -> None:
+        # When Excel is available the COM finalizer builds Measure Statistics and
+        # the date breakdown as real PivotTables, so we emit only the tiles here.
+        self.include_tables = include_tables
+
     def applies_to(self, profile: WorkbookProfile) -> bool:
         t = profile.primary
-        return bool(t and t.measures and t.row_count > 0)
+        return bool(t and t.key_measures and t.row_count > 0)
 
     def run(self, profile: WorkbookProfile) -> Optional[SheetSpec]:
         table = profile.primary
@@ -29,10 +34,10 @@ class KpiAnalyzer(Analyzer):
             subheading=f"Source: {table.sheet_name}  •  {table.row_count:,} records",
         )
 
-        # Headline tiles: record count + total/avg of up to 3 measures.
+        # Headline tiles: record count + total/avg of up to 3 key measures.
         spec.kpi_tiles.append(KpiTile("Total Records", f"{table.row_count:,}"))
         date_cols = table.date_columns
-        for measure in table.measures[:3]:
+        for measure in (table.key_measures or table.measures)[:3]:
             total = measure.total or 0.0
             tile = KpiTile(
                 label=f"Total {measure.name}",
@@ -48,7 +53,11 @@ class KpiAnalyzer(Analyzer):
                     tile.good = growth >= 0
             spec.kpi_tiles.append(tile)
 
-        # Per-measure statistics table.
+        if not self.include_tables:
+            # Pivots (Measure Statistics, date breakdown) are added by Excel below.
+            return spec
+
+        # --- static-table fallback (no Excel) ---
         stat_rows = []
         for m in table.measures:
             stat_rows.append([
@@ -63,8 +72,6 @@ class KpiAnalyzer(Analyzer):
             formats=[NumberFormat.GENERAL, NumberFormat.INTEGER, NumberFormat.DECIMAL,
                      NumberFormat.DECIMAL, NumberFormat.DECIMAL, NumberFormat.DECIMAL],
         ))
-
-        # Top categories by the first measure, if a dimension exists.
         if table.dimensions:
             dim = table.dimensions[0]
             measure = table.measures[0]
@@ -76,12 +83,4 @@ class KpiAnalyzer(Analyzer):
                     rows=[[k, round(v, 2)] for k, v in ranked],
                     formats=[NumberFormat.GENERAL, NumberFormat.DECIMAL],
                 ))
-
-        spec.text_blocks.append(TextBlock(
-            title="How to read this",
-            paragraphs=[
-                "KPIs are computed directly from your source data and refresh "
-                "each time you re-run the analysis.",
-            ],
-        ))
         return spec

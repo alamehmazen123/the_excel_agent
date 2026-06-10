@@ -56,6 +56,8 @@ class ChartSpec:
 class TextBlock:
     title: str
     paragraphs: list[str]
+    # 'normal' | 'highlight' (bold navy) | 'recommend' (red bold, underlined title)
+    style: str = "normal"
 
 
 @dataclass

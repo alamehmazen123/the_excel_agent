@@ -12,6 +12,7 @@ from typing import Optional
 
 from openpyxl import load_workbook
 from openpyxl.chart import BarChart, LineChart, PieChart, Reference
+from openpyxl.chart.label import DataLabelList
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -64,18 +65,21 @@ def _unique_sheet_name(wb, base: str) -> str:
     return f"{base} ({i})"
 
 
+_BRAND_BLUE = "0070C0"   # vivid blue for the heading / hospital name
+
+
 def _write_heading(ws: Worksheet, spec: SheetSpec, row: int) -> int:
+    # Heading text rendered BOLD + BLUE on white (e.g. "SAHEL GENERAL HOSPITAL").
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
     c = ws.cell(row=row, column=1, value=spec.heading)
-    c.font = Font(name="Calibri", size=18, bold=True, color=_WHITE)
-    c.fill = PatternFill("solid", fgColor=_NAVY)
+    c.font = Font(name="Calibri", size=20, bold=True, color=_BRAND_BLUE)
     c.alignment = Alignment(vertical="center", indent=1)
-    ws.row_dimensions[row].height = 30
+    ws.row_dimensions[row].height = 32
     row += 1
     if spec.subheading:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
         s = ws.cell(row=row, column=1, value=spec.subheading)
-        s.font = Font(size=10, italic=True, color=_GREY)
+        s.font = Font(size=11, bold=True, color=_NAVY)
         s.alignment = Alignment(indent=1)
         row += 1
     return row + 1
@@ -164,7 +168,7 @@ def _add_chart(ws: Worksheet, chart: ChartSpec, anchor: str,
         ch = LineChart()
     else:
         ch = PieChart()
-    ch.title = chart.title
+    ch.title = chart.title          # title sits ABOVE the chart by default
     ch.height = 7.5
     ch.width = 15
 
@@ -174,19 +178,54 @@ def _add_chart(ws: Worksheet, chart: ChartSpec, anchor: str,
                          max_row=data_start_row + n)
     ch.add_data(data_ref, titles_from_data=True)
     ch.set_categories(cats_ref)
+
+    # --- req 8: chart formatting ---
+    if chart.kind in (ChartKind.BAR, ChartKind.LINE):
+        ch.legend = None                                   # LEGEND = None
+        # show both primary axes
+        ch.x_axis.delete = False
+        ch.y_axis.delete = False
+        ch.x_axis.majorTickMark = "out"
+        ch.y_axis.majorTickMark = "out"
+        # keep category (date) labels readable
+        ch.x_axis.tickLblPos = "low"
+    if chart.kind == ChartKind.BAR:
+        # Data labels = Outside End, value shown.
+        ch.dataLabels = DataLabelList()
+        ch.dataLabels.showVal = True
+        ch.dataLabels.showSerName = False
+        ch.dataLabels.showCatName = False
+        ch.dataLabels.showLegendKey = False
+        ch.dataLabels.dLblPos = "outEnd"
     ws.add_chart(ch, anchor)
 
 
 def _write_text(ws: Worksheet, block: TextBlock, row: int) -> int:
+    style = getattr(block, "style", "normal")
+    # Title styling per block style.
     tc = ws.cell(row=row, column=1, value=block.title)
-    tc.font = Font(size=11, bold=True, color=_NAVY)
+    if style == "recommend":
+        tc.font = Font(size=13, bold=True, color=_RED, underline="single")
+    elif style == "highlight":
+        tc.font = Font(size=12, bold=True, color=_NAVY)
+    else:
+        tc.font = Font(size=11, bold=True, color=_NAVY)
     row += 1
+
     for para in block.paragraphs:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
-        pc = ws.cell(row=row, column=1, value=para)
-        pc.font = Font(size=10, color=_GREY)
+        text = para
+        if style == "recommend":
+            text = f"➤  {para}"
+            font = Font(size=11, bold=True, color=_RED)
+        elif style == "highlight":
+            font = Font(size=11, bold=True, color=_NAVY)
+        else:
+            font = Font(size=10, color=_GREY)
+        pc = ws.cell(row=row, column=1, value=text)
+        pc.font = font
         pc.alignment = Alignment(wrap_text=True, vertical="top")
-        ws.row_dimensions[row].height = max(15, 15 * (len(para) // 90 + 1))
+        ws.row_dimensions[row].height = max(15, 15 * (len(text) // 90 + 1))
         row += 1
     return row + 1
 

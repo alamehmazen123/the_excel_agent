@@ -18,7 +18,13 @@ class ColumnType(str, Enum):
     DATE = "date"
     CATEGORICAL = "categorical"
     TEXT = "text"          # high-cardinality free text / IDs
+    IDENTIFIER = "identifier"   # row id / ID / EVENT ID -- never a measure
     EMPTY = "empty"
+
+
+# Header keywords used to rank "value" measures (money/amount) above prices etc.
+_VALUE_KEYWORDS = ("pnl", "usdt", "usd", "amount", "profit", "revenue", "sales",
+                   "income", "net", "gross", "value", "total", "balance", "$")
 
 
 @dataclass
@@ -29,6 +35,8 @@ class ColumnProfile:
     count: int = 0                   # non-null values
     nulls: int = 0
     distinct: int = 0
+    # The source cell number format (e.g. '"$"#,##0'), copied onto outputs.
+    number_format: str = "General"
     # Numeric stats (None for non-numeric columns)
     minimum: Optional[float] = None
     maximum: Optional[float] = None
@@ -39,11 +47,28 @@ class ColumnProfile:
 
     @property
     def is_measure(self) -> bool:
+        # IDENTIFIER is numeric but is a row id -- never a measure.
         return self.ctype in (ColumnType.NUMERIC, ColumnType.CURRENCY, ColumnType.PERCENT)
+
+    @property
+    def is_value(self) -> bool:
+        """A money/amount measure (not a percentage)."""
+        return self.ctype in (ColumnType.NUMERIC, ColumnType.CURRENCY)
 
     @property
     def is_dimension(self) -> bool:
         return self.ctype in (ColumnType.CATEGORICAL, ColumnType.DATE)
+
+    @property
+    def value_score(self) -> int:
+        """Higher = more likely the meaningful value to total (PNL over price)."""
+        n = self.name.lower()
+        score = sum(2 for k in _VALUE_KEYWORDS if k in n)
+        if self.ctype == ColumnType.CURRENCY:
+            score += 3
+        if "price" in n:          # de-prioritise prices vs PNL/amounts
+            score -= 2
+        return score
 
 
 @dataclass
@@ -68,8 +93,63 @@ class TableProfile:
         return [c for c in self.columns if c.is_measure]
 
     @property
+    def value_measures(self) -> list[ColumnProfile]:
+        """Money/amount measures, best candidate first (PNL before price)."""
+        vals = [c for c in self.columns if c.is_value]
+        return sorted(vals, key=lambda c: c.value_score, reverse=True)
+
+    @property
+    def percent_measures(self) -> list[ColumnProfile]:
+        return [c for c in self.columns if c.ctype == ColumnType.PERCENT]
+
+    @property
+    def primary_value_measure(self) -> Optional[ColumnProfile]:
+        vals = self.value_measures
+        return vals[0] if vals else None
+
+    @property
+    def key_measures(self) -> list[ColumnProfile]:
+        """Meaningful measures for tiles/stats: values first, then percents."""
+        return self.value_measures + self.percent_measures
+
+    @property
     def dimensions(self) -> list[ColumnProfile]:
-        return [c for c in self.columns if c.is_dimension]
+        # categorical dimensions (dates handled separately for grouping)
+        return [c for c in self.columns if c.ctype == ColumnType.CATEGORICAL]
+
+    @property
+    def pivot_dimensions(self) -> list[ColumnProfile]:
+        """Columns that make MEANINGFUL pivot row groupers.
+
+        Includes clean categoricals AND moderate/high-card text (e.g.
+        TRIGGER DETAIL) so the user can break down by them -- but excludes:
+          * single-value columns (distinct < 2): a 1-row pivot is pointless;
+          * near-unique columns (ratio > 0.95): row ids / GUIDs / free text.
+        Wide dimensions are flagged via ``is_wide_dimension`` so the pivot can
+        be limited to a Top-N by value.
+        """
+        out: list[ColumnProfile] = []
+        for c in self.columns:
+            if c.ctype not in (ColumnType.CATEGORICAL, ColumnType.TEXT):
+                continue
+            if c.distinct < 2:
+                continue
+            ratio = c.distinct / max(1, c.count)
+            if ratio > 0.95:
+                continue
+            out.append(c)
+        return out
+
+    @staticmethod
+    def is_wide_dimension(col: ColumnProfile) -> bool:
+        return col.distinct > 25
+
+    @property
+    def identifier_column(self) -> Optional[ColumnProfile]:
+        for c in self.columns:
+            if c.ctype == ColumnType.IDENTIFIER:
+                return c
+        return None
 
     @property
     def date_columns(self) -> list[ColumnProfile]:
