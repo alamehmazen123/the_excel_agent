@@ -202,10 +202,13 @@ def _add_chart(ws: Worksheet, chart: ChartSpec, anchor: str,
 
 def _write_text(ws: Worksheet, block: TextBlock, row: int) -> int:
     style = getattr(block, "style", "normal")
+    _AMBER = "C05621"
     # Title styling per block style.
     tc = ws.cell(row=row, column=1, value=block.title)
     if style == "recommend":
         tc.font = Font(size=13, bold=True, color=_RED, underline="single")
+    elif style == "warn":
+        tc.font = Font(size=12, bold=True, color=_AMBER, underline="single")
     elif style == "highlight":
         tc.font = Font(size=12, bold=True, color=_NAVY)
     else:
@@ -218,7 +221,11 @@ def _write_text(ws: Worksheet, block: TextBlock, row: int) -> int:
         if style == "recommend":
             text = f"➤  {para}"
             font = Font(size=11, bold=True, color=_RED)
+        elif style == "warn":
+            text = f"⚠  {para}"
+            font = Font(size=11, bold=True, color=_AMBER)
         elif style == "highlight":
+            text = f"•  {para}"
             font = Font(size=11, bold=True, color=_NAVY)
         else:
             font = Font(size=10, color=_GREY)

@@ -25,6 +25,11 @@ hidden = collect_submodules('keyring') + collect_submodules('win32com') + [
     'win32con',
 ]
 
+# Bundle the gitignored secrets module (holds the default Groq key) if present.
+# It is imported conditionally in config.py, so PyInstaller needs the hint.
+if os.path.exists(os.path.join(project_dir, 'local_secrets.py')):
+    hidden.append('local_secrets')
+
 a = Analysis(
     ['main.py'],
     pathex=[project_dir],

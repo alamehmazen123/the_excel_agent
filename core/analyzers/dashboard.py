@@ -10,10 +10,7 @@ from ..models import WorkbookProfile
 from ..render import ChartKind, ChartSpec, KpiTile, SheetSpec, TextBlock
 from .base import Analyzer
 
-ORG_NAME = "SAHEL GENERAL HOSPITAL"
-PRODUCT_NAME = "Excel Intelligence Agent"
-
-_MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+_MONTHS =["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
@@ -40,9 +37,8 @@ class DashboardAnalyzer(Analyzer):
             return None
 
         spec = SheetSpec(
-            name=SHEET_DASHBOARD, heading=ORG_NAME,
-            subheading=(f"{PRODUCT_NAME}   •   Source: {table.sheet_name}  •  "
-                        f"{table.row_count:,} records"),
+            name=SHEET_DASHBOARD, heading="Executive Dashboard",
+            subheading=f"Source: {table.sheet_name}  •  {table.row_count:,} records",
         )
 
         # Precisely report any sheets skipped because they already hold a pivot.

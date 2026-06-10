@@ -45,6 +45,12 @@ class MainWindow(QWidget):
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(18)
 
+        # Organization banner (the hospital name lives in the APP, not the Excel).
+        org = QLabel(config.ORG_NAME)
+        org.setObjectName("OrgLabel")
+        org.setAlignment(Qt.AlignHCenter)
+        root.addWidget(org)
+
         # Header
         header = QHBoxLayout()
         titles = QVBoxLayout()
