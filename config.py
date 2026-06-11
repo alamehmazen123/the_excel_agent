@@ -11,7 +11,7 @@ import base64
 
 APP_NAME = "Excel Intelligence Agent"
 ORG_NAME = "SAHEL GENERAL HOSPITAL"   # shown in the app window header
-APP_VERSION = "1.7.0"          # <-- bump this for every release (1.0.1, 1.1.0, ...)
+APP_VERSION = "1.9.4"          # <-- bump this for every release (1.0.1, 1.1.0, ...)
 EXE_NAME = "ExcelIntelligenceAgent"
 
 # BUILD_DATE is stamped automatically at build time by tools/stamp_build.py.
@@ -21,12 +21,13 @@ try:
 except Exception:
     BUILD_DATE = "development build"
 
-# URL of the JSON update manifest (see README). Leave "" to disable update checks.
-# Example manifest:
-#   { "version": "1.1.0", "release_date": "2026-07-01",
-#     "url": "https://.../ExcelIntelligenceAgent.exe",
-#     "notes": "What changed in this release." }
-UPDATE_MANIFEST_URL = ""
+# Auto-update via GitHub Releases. The app checks this repo's latest release on
+# launch; if its tag (e.g. v1.9.3) is newer than APP_VERSION, it auto-updates by
+# downloading the released Setup.exe. Set GITHUB_REPO to "" to disable updates.
+GITHUB_REPO = "alamehmazen123/the_excel_agent"
+UPDATE_MANIFEST_URL = (
+    f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+    if GITHUB_REPO else "")
 
 # Keyring service / username used to store the user-supplied Groq key.
 KEYRING_SERVICE = "ExcelIntelligenceAgent"
@@ -56,6 +57,15 @@ OUTPUT_SHEETS = {
 # Each value may be a raw 'gsk_...' key or a base64-obfuscated blob.
 # (Per-user keys entered in the app's Settings always take precedence at runtime.)
 def _raw_bundled_key() -> str:
+    # 1. buildinfo.py -- stamped at build time, reliably bundled into the exe.
+    try:
+        import buildinfo  # noqa: PLC0415
+        k = (getattr(buildinfo, "BUNDLED_GROQ_KEY", "") or "").strip()
+        if k:
+            return k
+    except Exception:
+        pass
+    # 2. local_secrets.py -- gitignored, used for dev runs from source.
     try:
         import local_secrets  # noqa: PLC0415 -- gitignored, optional
         k = (getattr(local_secrets, "GROQ_API_KEY", "") or "").strip()
@@ -63,6 +73,7 @@ def _raw_bundled_key() -> str:
             return k
     except Exception:
         pass
+    # 3. environment variable.
     import os  # noqa: PLC0415
     return (os.environ.get("GROQ_API_KEY", "") or "").strip()
 

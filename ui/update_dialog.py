@@ -1,14 +1,86 @@
-"""Update-available dialog: shows version/date/notes, downloads, installs, restarts."""
+"""Update-available dialogs: a prompt variant and an automatic variant."""
 from __future__ import annotations
 
 import config
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox,
                                QProgressBar, QPushButton, QTextEdit, QVBoxLayout)
 
 from core import updater
 
 from .update_worker import UpdateDownloadWorker, run_on_thread
+
+
+class AutoUpdateDialog(QDialog):
+    """Automatic update: 'updating now, please wait…' -> download -> install."""
+
+    def __init__(self, info: updater.UpdateInfo, parent=None) -> None:
+        super().__init__(parent)
+        self._info = info
+        self._thread = None
+        self._worker = None
+        self.setWindowTitle("Updating")
+        # No close button -- the update runs automatically.
+        self.setWindowFlags(Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
+        self.setMinimumWidth(420)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setSpacing(12)
+        title = QLabel(f"New version {info.version} available")
+        title.setObjectName("TitleLabel")
+        layout.addWidget(title)
+        self.msg = QLabel("Updating now, please wait…")
+        self.msg.setObjectName("SubtitleLabel")
+        self.msg.setWordWrap(True)
+        layout.addWidget(self.msg)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.progress)
+        self.close_btn = QPushButton("Close")
+        self.close_btn.clicked.connect(self.reject)
+        self.close_btn.setVisible(False)
+        layout.addWidget(self.close_btn)
+
+        # Start downloading as soon as the dialog is on screen.
+        QTimer.singleShot(150, self._start)
+
+    def _start(self) -> None:
+        if not updater.is_frozen():
+            self.msg.setText("Self-update only works in the installed app.")
+            self.close_btn.setVisible(True)
+            return
+        self._worker = UpdateDownloadWorker(self._info)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.ready.connect(self._on_ready)
+        self._worker.failed.connect(self._on_failed)
+        self._thread = run_on_thread(self._worker)
+
+    def _on_progress(self, done: int, total: int) -> None:
+        if total > 0:
+            self.progress.setValue(int(done / total * 100))
+            self.msg.setText(f"Downloading update… {done // 1_000_000} of "
+                             f"{total // 1_000_000} MB")
+        else:
+            self.progress.setRange(0, 0)
+
+    def _on_ready(self, path: str) -> None:
+        if self._thread:
+            self._thread.quit()
+        self.msg.setText("Installing and restarting…")
+        self.progress.setRange(0, 0)
+        try:
+            updater.apply_update_and_restart(path)   # closes app, installs, relaunches
+        except Exception as exc:                      # noqa: BLE001
+            self._on_failed(str(exc))
+
+    def _on_failed(self, msg: str) -> None:
+        if self._thread:
+            self._thread.quit()
+        self.progress.setVisible(False)
+        self.msg.setText(f"Update could not be installed:\n{msg}\n\n"
+                         "You can keep using the current version.")
+        self.close_btn.setVisible(True)
 
 
 class UpdateDialog(QDialog):

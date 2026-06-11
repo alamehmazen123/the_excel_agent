@@ -39,9 +39,33 @@ if errorlevel 1 goto :error
 
 echo.
 echo ============================================
-echo  DONE. Distribute this single file:
-echo    Output\ExcelIntelligenceAgent-Setup.exe
+echo  Built: Output\ExcelIntelligenceAgent-Setup.exe  (v%APPVER%)
 echo ============================================
+
+REM 4) Publish to GitHub Releases so installed apps auto-update on next launch.
+where gh >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo  gh CLI not found -- skipping auto-publish.
+  echo  To enable one-click auto-update for colleagues:
+  echo     winget install GitHub.cli   then   gh auth login
+  echo  Or upload Output\ExcelIntelligenceAgent-Setup.exe to a new GitHub Release manually.
+  goto :done
+)
+echo Publishing release v%APPVER% to GitHub...
+gh release create v%APPVER% "Output\ExcelIntelligenceAgent-Setup.exe" --title "v%APPVER%" --notes "Update to v%APPVER%"
+if errorlevel 1 (
+  echo.
+  echo  Publish failed. Run 'gh auth login' once, then re-run build.bat,
+  echo  or upload Output\ExcelIntelligenceAgent-Setup.exe to GitHub Releases manually.
+  goto :done
+)
+echo.
+echo  Published. Colleagues' apps will auto-update to v%APPVER% on next launch.
+
+:done
+echo.
+echo  DONE.
 pause
 exit /b 0
 

@@ -62,7 +62,8 @@ class ExecutiveSummaryAnalyzer(Analyzer):
             "breakdowns": [],
         }
 
-        for m in table.key_measures[:5]:
+        chosen_measures = table.measures_for(profile.preferred_measure_names)
+        for m in chosen_measures[:5]:
             entry: dict[str, Any] = {
                 "name": m.name, "unit": _unit(m),
                 "total": round(m.total or 0, 2),
@@ -82,7 +83,7 @@ class ExecutiveSummaryAnalyzer(Analyzer):
                 entry["negative_total_display"] = fmt_measure(m, nsum)
             metrics["measures"].append(entry)
 
-        measure = table.primary_value_measure
+        measure = table.value_for(profile.preferred_value_name)
         if measure is not None:
             grand = measure.total or 0.0
             for dim in table.pivot_dimensions[:3]:

@@ -82,11 +82,11 @@ class ExcelFinalizer:
 
             if pivot_plan and source_table is not None:
                 self._build_plan(excel, wb, pivot_plan, source_table, data_sheet)
+                self._build_dashboard_charts(wb)
 
             self._conditional_format_tables(excel, wb, skip={src_name},
                                             skip_sheets=skip_sheets)
             self._autofit_all(wb, skip_sheets=skip_sheets)
-            self._set_auto_refresh(wb)
             wb.Save()
         finally:
             if wb is not None:
@@ -119,6 +119,7 @@ class ExcelFinalizer:
         for spec in plan:
             by_sheet[spec.target_sheet].append(spec)
 
+        built: list = []          # (pivot, spec) -> sorted/CF'd in a second pass
         for sheet_name, specs in by_sheet.items():
             if sheet_name == SHEET_PIVOT:
                 ws = self._replace_sheet(wb, sheet_name)
@@ -140,11 +141,41 @@ class ExcelFinalizer:
                 cursor = used.Row + used.Rows.Count + 2
 
             for spec in specs:
-                cursor = self._build_one_pivot(excel, wb, ws, spec,
-                                               source_table, cursor)
+                pt, cursor = self._build_one_pivot(excel, wb, ws, spec,
+                                                   source_table, cursor)
+                if pt is not None:
+                    built.append((pt, spec))
+
+        # SECOND PASS: apply sorting + conditional formatting only after every
+        # pivot exists. Date grouping refreshes the shared cache and would wipe
+        # these if done inline, so they must come last.
+        # Split into sub-passes: subtotal removal can refresh the shared cache,
+        # so do ALL of those first, then sort, then conditional-format -- this
+        # way nothing later wipes an earlier pivot's sort/CF.
+        for pt, _spec in built:
+            self._disable_subtotals(pt)
+        for pt, spec in built:
+            last = spec.row_fields[-1] if spec.row_fields else None
+            if last and last != spec.group_date_field:
+                self._sort_and_limit(pt, last, spec.visible_items)
+        for pt, _spec in built:
+            self._cf_pivot(pt)
+
+    def _disable_subtotals(self, pt) -> None:
+        """Turn off subtotals so each data field's DataRange is pure detail
+        cells (no subtotal/grand-total rows) -- this is what 'exclude subtotals'
+        means and keeps the Top-1 conditional format honest."""
+        try:
+            for pf in pt.RowFields:
+                try:
+                    pf.Subtotals = tuple([False] * 12)
+                except Exception:
+                    continue
+        except Exception:
+            pass
 
     def _build_one_pivot(self, excel, wb, ws, spec: PivotSpec, source_table,
-                         cursor: int) -> int:
+                         cursor: int):
         # Title above the pivot.
         tcell = ws.Cells(cursor, 1)
         tcell.Value = spec.title
@@ -178,59 +209,115 @@ class ExcelFinalizer:
         for df in spec.data_fields:
             fld = pt.AddDataField(pt.PivotFields(df.source_field),
                                   df.caption, df.func)
+            if getattr(df, "calculation", None) is not None:
+                try:
+                    fld.Calculation = df.calculation     # e.g. % of grand total
+                except Exception:
+                    pass
             try:
                 fld.NumberFormat = df.number_format
             except Exception:
                 pass
-
-        # Sort + Top-N limiting on the last row field (e.g. wide TRIGGER DETAIL).
-        if spec.row_fields:
-            self._sort_and_limit(pt, spec.row_fields[-1], spec.sort_field,
-                                 spec.visible_items)
 
         try:
             pt.RowGrand = True
             pt.ColumnGrand = True
         except Exception:
             pass
-        try:
-            pt.PivotCache().RefreshOnFileOpen = True
-        except Exception:
-            pass
-
-        self._cf_pivot(pt)
+        # NOTE: sorting + conditional formatting are applied in a SECOND pass
+        # (see _build_plan) once every pivot exists, and we deliberately do NOT
+        # enable RefreshOnFileOpen -- both a later date-group on the shared cache
+        # and an on-open refresh would otherwise wipe the sort order and CF.
 
         used = pt.TableRange2
-        return used.Row + used.Rows.Count + 2
+        return pt, used.Row + used.Rows.Count + 2
 
-    def _sort_and_limit(self, pt, field_name: str, sort_field: Optional[str],
+    def _sort_and_limit(self, pt, field_name: str,
                         visible_items: Optional[list]) -> None:
-        """Sort a row field descending and, for wide fields, show only Top-N items."""
+        """Sort a row field by its value field (descending) and, for wide fields,
+        show only the Top-N items. AutoSort is a field-definition property, so it
+        survives the cache refreshes that reset manual PivotItem positions."""
         try:
             pf = pt.PivotFields(field_name)
         except Exception:
             return
-        # Hide non-top items FIRST (PivotItems must be CALLED), then sort.
+
+        # Hide non-top items (PivotItems must be CALLED).
         if visible_items:
             allow = {str(v) for v in visible_items}
             try:
                 items = pf.PivotItems()
-                count = items.Count
-            except Exception:
-                count = 0
-            for i in range(1, count + 1):
-                try:
+                for i in range(1, items.Count + 1):
                     it = items.Item(i)
                     want = str(it.Name) in allow
                     if bool(it.Visible) != want:
                         it.Visible = want
-                except Exception:
-                    continue
-        if sort_field:
-            try:
-                pf.AutoSort(2, sort_field)        # xlDescending
             except Exception:
                 pass
+
+        # AutoSort the field descending by the (first) data field.
+        try:
+            cap = pt.DataFields.Item(1).Name
+            pf.AutoSort(2, cap)            # xlDescending
+        except Exception:
+            pass
+
+    # -- Dashboard: one chart per category pivot ------------------------------
+    def _build_dashboard_charts(self, wb, max_charts: int = 6) -> None:
+        """Add a column chart to the Dashboard for each single-dimension value
+        pivot on the Pivot Analysis sheet, so the dashboard reflects the pivots."""
+        from .constants import SHEET_DASHBOARD  # noqa: PLC0415
+        try:
+            dash = wb.Worksheets(SHEET_DASHBOARD)
+            pv = wb.Worksheets(SHEET_PIVOT)
+        except Exception:
+            return
+        # Clear the old single static chart so we can lay out fresh ones.
+        try:
+            for ch in list(dash.ChartObjects()):
+                ch.Delete()
+        except Exception:
+            pass
+
+        used = dash.UsedRange
+        top0 = used.Top + used.Height + 12
+        left0 = dash.Cells(1, 1).Left + 6
+        W, H, GAP = 360, 220, 16
+        made = 0
+        XL_COL_CLUSTERED = 51
+        for pt in pv.PivotTables():
+            if made >= max_charts:
+                break
+            try:
+                rfields = list(pt.RowFields)
+                if len(rfields) != 1:                 # single dimension only
+                    continue
+                dim_name = rfields[0].Name
+                df = pt.DataFields.Item(1)
+                if "%" in (df.NumberFormat or ""):    # chart the $ / value pivots
+                    continue
+                if pt.PivotFields(dim_name).PivotItems().Count > 25:   # skip wide
+                    continue
+                col = made % 2
+                rowi = made // 2
+                left = left0 + col * (W + GAP)
+                top = top0 + rowi * (H + GAP)
+                shp = dash.Shapes.AddChart2(-1, XL_COL_CLUSTERED, left, top, W, H)
+                chart = shp.Chart
+                chart.SetSourceData(pt.TableRange1)
+                try:
+                    chart.HasLegend = False
+                except Exception:
+                    pass
+                try:
+                    chart.HasTitle = True
+                    cap = pv.Cells(pt.TableRange2.Row - 1, 1).Value
+                    chart.ChartTitle.Text = str(cap) if cap else f"{df.Name} by {dim_name}"
+                except Exception:
+                    pass
+                made += 1
+            except Exception:
+                continue
 
     # -- conditional formatting (req 6,7): top-1 per value field --------------
     def _cf_pivot(self, pt) -> None:
@@ -246,13 +333,13 @@ class ExcelFinalizer:
             return
         for fld in fields:
             try:
+                # A data field's DataRange is the DETAIL value cells only (Excel
+                # excludes grand totals); with subtotals disabled it has no
+                # subtotal rows either, so a plain Top-1 rule highlights exactly
+                # the single largest value of that column.
                 rng = fld.DataRange
-                cell = rng.Cells(1, 1)
-                fc = cell.FormatConditions.AddTop10()
-                try:
-                    fc.ScopeType = XL_DATA_FIELD_SCOPE
-                except Exception:
-                    pass
+                rng.FormatConditions.Delete()
+                fc = rng.FormatConditions.AddTop10()
                 fc.TopBottom = XL_TOP10_TOP
                 fc.Rank = 1
                 fc.Percent = False

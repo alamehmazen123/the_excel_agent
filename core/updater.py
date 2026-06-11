@@ -58,31 +58,47 @@ def is_newer(remote: str, local: str) -> bool:
     return a > b
 
 
+def _parse_github_release(data: dict) -> Optional[UpdateInfo]:
+    """Map a GitHub 'latest release' payload to UpdateInfo (find the .exe asset)."""
+    version = str(data.get("tag_name", "")).lstrip("vV").strip()
+    if not version:
+        return None
+    url = ""
+    for asset in data.get("assets", []) or []:
+        name = str(asset.get("name", ""))
+        if name.lower().endswith(".exe"):
+            url = str(asset.get("browser_download_url", ""))
+            break
+    if not url:
+        return None
+    return UpdateInfo(version=version,
+                      release_date=str(data.get("published_at", ""))[:10],
+                      url=url, notes=str(data.get("body", "")).strip())
+
+
 def check_for_update(manifest_url: str, current_version: str,
                      timeout: float = 10.0) -> Optional[UpdateInfo]:
-    """Fetch the manifest and return UpdateInfo if a newer version exists.
-
-    Fails soft: any network/parse error returns None (never raises to caller).
-    """
+    """Return UpdateInfo if a newer version exists. Supports GitHub Releases and
+    a plain JSON manifest. Fails soft: any error returns None."""
     if not manifest_url:
         return None
     try:
-        resp = requests.get(manifest_url, timeout=timeout)
-        if resp.status_code != 200:
+        headers = {"Accept": "application/vnd.github+json"} if "api.github.com" in manifest_url else {}
+        resp = requests.get(manifest_url, timeout=timeout, headers=headers)
+        if resp.status_code != 200:        # 404 = no releases yet -> no update
             return None
         data = resp.json()
-        version = str(data.get("version", "")).strip()
-        url = str(data.get("url", "")).strip()
-        if not version or not url:
+        if "api.github.com" in manifest_url:
+            info = _parse_github_release(data)
+        else:
+            version = str(data.get("version", "")).strip()
+            url = str(data.get("url", "")).strip()
+            info = (UpdateInfo(version, str(data.get("release_date", "")).strip(),
+                               url, str(data.get("notes", "")).strip())
+                    if version and url else None)
+        if info is None or not is_newer(info.version, current_version):
             return None
-        if not is_newer(version, current_version):
-            return None
-        return UpdateInfo(
-            version=version,
-            release_date=str(data.get("release_date", "")).strip(),
-            url=url,
-            notes=str(data.get("notes", "")).strip(),
-        )
+        return info
     except Exception:
         return None
 
@@ -114,6 +130,24 @@ def download_update(info: UpdateInfo, progress: Optional[DownloadProgress] = Non
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         raise
+
+
+def launch_installer_silent(installer_path: str) -> bool:
+    """Run the downloaded installer SILENTLY in the background, without relaunching.
+
+    Called as the app is closing, so the install completes invisibly and the user
+    simply gets the new version next time they open the app. Returns immediately.
+    """
+    if not is_frozen():
+        return False
+    args = [installer_path, "/VERYSILENT", "/SUPPRESSMSGBOXES",
+            "/CLOSEAPPLICATIONS", "/NORESTART"]
+    DETACHED = 0x00000008 | 0x00000200     # DETACHED_PROCESS | CREATE_NEW_GROUP
+    try:
+        subprocess.Popen(args, close_fds=True, creationflags=DETACHED)
+        return True
+    except Exception:
+        return False
 
 
 def apply_update_and_restart(installer_path: str) -> None:

@@ -17,7 +17,7 @@ from .excel_com import ExcelFinalizer, excel_available
 from .loader import load_workbook_profile
 from .pivot_plan import build_pivot_plan
 from .models import (AnalysisOptions, AnalysisResult, ProgressCallback,
-                     WorkbookProfile, _noop_progress)
+                     TableProfile, WorkbookProfile, _noop_progress)
 from .writer import write_results
 
 
@@ -36,6 +36,49 @@ class Engine:
         """Which analyses are meaningful for this workbook."""
         return {a.key: a.applies_to(profile) for a in self._all_analyzers()}
 
+    def describe_columns(self, profile: WorkbookProfile,
+                         sheet_name: Optional[str] = None) -> dict:
+        """Describe a table's columns for the Custom wizard.
+
+        Returns the data sheets, plus the groupable dimensions and the value
+        measures of the chosen table, with a recommended pre-selection.
+        """
+        from .models import ColumnType  # noqa: PLC0415
+        sheets = [t.sheet_name for t in profile.tables]
+        table = None
+        if sheet_name:
+            table = next((t for t in profile.tables if t.sheet_name == sheet_name), None)
+        table = table or profile.primary
+        if table is None:
+            return {"sheets": sheets, "sheet": None, "dimensions": [], "measures": []}
+
+        recommended_dims = {c.name for c in table.pivot_dimensions[:6]}
+        dims = []
+        for c in table.pivot_dimensions:
+            if c.ctype == ColumnType.DATE:
+                kind, detail = "date", "grouped by month/year"
+            elif TableProfile.is_wide_dimension(c):
+                kind, detail = "wide", f"{c.distinct} values · top 20"
+            else:
+                kind, detail = "category", f"{c.distinct} values"
+            dims.append({"name": c.name, "kind": kind, "detail": detail,
+                         "recommended": c.name in recommended_dims})
+        # dates are also offered as dimensions (grouped) -> include any not already
+        for c in table.date_columns:
+            if not any(d["name"] == c.name for d in dims):
+                dims.append({"name": c.name, "kind": "date",
+                             "detail": "grouped by month/year", "recommended": True})
+
+        rec_measures = {c.name for c in table.key_measures[:3]}
+        measures = []
+        for c in table.value_measures + table.percent_measures:
+            unit = ("percent" if c.ctype == ColumnType.PERCENT
+                    else "currency" if c.ctype == ColumnType.CURRENCY else "number")
+            measures.append({"name": c.name, "unit": unit,
+                             "recommended": c.name in rec_measures})
+        return {"sheets": sheets, "sheet": table.sheet_name,
+                "dimensions": dims, "measures": measures}
+
     # -- main run -------------------------------------------------------------
     def run(self, workbook_path: str, options: AnalysisOptions,
             progress_cb: Optional[ProgressCallback] = None) -> AnalysisResult:
@@ -45,6 +88,21 @@ class Engine:
 
         progress(0.05, "Opening workbook…")
         profile = load_workbook_profile(workbook_path)
+
+        # Custom mode: target the chosen sheet and remember the user's measure
+        # picks so the KPI/Dashboard/Summary sheets use them too.
+        custom = options.custom if (options.custom and options.custom.is_valid()) else None
+        if custom is not None:
+            if custom.sheet_name:
+                for i, t in enumerate(profile.tables):
+                    if t.sheet_name == custom.sheet_name:
+                        profile.primary_table_index = i
+                        break
+            profile.preferred_measure_names = [m.name for m in custom.measures]
+            profile.preferred_value_name = next(
+                (m.name for m in custom.measures
+                 if (profile.primary.column(m.name) and
+                     profile.primary.column(m.name).is_value)), None)
 
         progress(0.20, "Detecting tables and column types…")
         use_com = excel_available()
@@ -86,7 +144,7 @@ class Engine:
         if use_com:
             progress(0.86, "Building active pivot tables in Excel…")
             # Build the pivot plan, keeping only pivots whose target sheet exists.
-            plan = build_pivot_plan(profile)
+            plan = build_pivot_plan(profile, custom)
             plan = [p for p in plan
                     if (p.target_sheet == SHEET_PIVOT and options.pivot)
                     or (p.target_sheet == SHEET_KPI and options.kpi)]
