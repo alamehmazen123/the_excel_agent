@@ -9,14 +9,17 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFrame, QGridLayout,
                                QHBoxLayout, QLabel, QMessageBox, QProgressBar,
-                               QPushButton, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSizePolicy, QVBoxLayout,
+                               QWidget)
 
 from core.models import AnalysisOptions
 from core.pipeline import Engine
 
+from core import updater
+
+from .custom_dialog import CustomWizardDialog
 from .settings_dialog import SettingsDialog
-from .update_dialog import UpdateDialog
-from .update_worker import UpdateCheckWorker, run_on_thread
+from .update_worker import UpdateCheckWorker, UpdateDownloadWorker, run_on_thread
 from .worker import start_analysis
 
 
@@ -24,24 +27,56 @@ class MainWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(config.APP_NAME)
-        self.setMinimumSize(720, 640)
+        # Small minimum so it fits even on modest laptops; the content scrolls.
+        self.setMinimumSize(480, 460)
         self.setAcceptDrops(True)
 
         self._path: str = ""
+        self._profile = None
         self._thread = None
         self._worker = None
         self._busy = False
 
         self._update_thread = None
         self._update_check = None
+        self._dl_thread = None
+        self._dl_worker = None
+        self._pending_installer = None      # set when a silent update is downloaded
 
         self._build()
         self._refresh_buttons()
+        self._size_to_screen()
         self._check_for_updates()
+
+    def _size_to_screen(self) -> None:
+        """Open at a comfortable size relative to the user's screen, centered,
+        and never larger than the available area (autofits any screen size)."""
+        from PySide6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(840, 720)
+            return
+        avail = screen.availableGeometry()
+        w = max(560, min(900, int(avail.width() * 0.62)))
+        h = max(480, min(860, int(avail.height() * 0.88)))
+        self.resize(w, h)
+        self.move(avail.x() + (avail.width() - w) // 2,
+                  avail.y() + (avail.height() - h) // 2)
 
     # -- layout ---------------------------------------------------------------
     def _build(self) -> None:
-        root = QVBoxLayout(self)
+        # A scroll area wraps the content so nothing is ever clipped on small
+        # screens; the inner column stretches to fill wider windows.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        content = QWidget()
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
+        root = QVBoxLayout(content)
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(18)
 
@@ -62,7 +97,10 @@ class MainWindow(QWidget):
         titles.addWidget(subtitle)
         header.addLayout(titles)
         header.addStretch(1)
-        gear = QPushButton("⚙  Settings")
+        gear = QPushButton("⚙")
+        gear.setObjectName("GearButton")
+        gear.setToolTip("Settings (advanced — change only if you know what you're doing)")
+        gear.setFixedSize(30, 30)
         gear.clicked.connect(self._open_settings)
         header.addWidget(gear, alignment=Qt.AlignTop)
         root.addLayout(header)
@@ -111,17 +149,23 @@ class MainWindow(QWidget):
 
         # Actions
         actions = QHBoxLayout()
-        self.analyze_btn = QPushButton("Analyze Workbook")
+        self.analyze_btn = QPushButton("Auto-Generate")
         self.analyze_btn.setObjectName("PrimaryButton")
         self.analyze_btn.clicked.connect(self._analyze)
         actions.addWidget(self.analyze_btn, 2)
+        self.custom_btn = QPushButton("Custom Generate…")
+        self.custom_btn.clicked.connect(self._custom_generate)
+        actions.addWidget(self.custom_btn, 2)
+        root.addLayout(actions)
+
+        actions2 = QHBoxLayout()
         self.open_wb_btn = QPushButton("Open Workbook")
         self.open_wb_btn.clicked.connect(self._open_workbook)
-        actions.addWidget(self.open_wb_btn, 1)
+        actions2.addWidget(self.open_wb_btn, 1)
         self.open_folder_btn = QPushButton("Open Output Folder")
         self.open_folder_btn.clicked.connect(self._open_folder)
-        actions.addWidget(self.open_folder_btn, 1)
-        root.addLayout(actions)
+        actions2.addWidget(self.open_folder_btn, 1)
+        root.addLayout(actions2)
 
         # Progress
         self.progress = QProgressBar()
@@ -194,6 +238,7 @@ class MainWindow(QWidget):
         if self._busy:
             return
         self._path = ""
+        self._profile = None
         self.file_label.setText("No workbook selected.  (You can also drag a file here.)")
         self.clear_btn.setVisible(False)
         self.progress.setValue(0)
@@ -209,8 +254,10 @@ class MainWindow(QWidget):
         try:
             engine = Engine()
             profile = engine.profile(self._path)
+            self._profile = profile
             applicable = engine.applicable_options(profile)
         except Exception as exc:                 # noqa: BLE001
+            self._profile = None
             self.status_label.setText(f"⚠  {exc}")
             for cb in self._checkboxes():
                 cb.setEnabled(True)
@@ -251,6 +298,24 @@ class MainWindow(QWidget):
             QMessageBox.information(self, config.APP_NAME,
                                     "Please select at least one output type.")
             return
+        self._start_run(options)
+
+    def _custom_generate(self) -> None:
+        if not self._path:
+            QMessageBox.information(self, config.APP_NAME, "Please select a workbook first.")
+            return
+        if self._profile is None:
+            QMessageBox.warning(self, config.APP_NAME,
+                                "Could not read this workbook's columns.")
+            return
+        dialog = CustomWizardDialog(Engine(), self._profile, self)
+        if dialog.exec() != dialog.DialogCode.Accepted or dialog.selection is None:
+            return
+        options = self._selected_options()
+        options.custom = dialog.selection
+        self._start_run(options)
+
+    def _start_run(self, options: AnalysisOptions) -> None:
         self._set_busy(True)
         self.status_label.setText("Starting…")
         self._thread, self._worker = start_analysis(
@@ -311,8 +376,30 @@ class MainWindow(QWidget):
     def _on_update_found(self, info) -> None:
         if self._update_thread:
             self._update_thread.quit()
-        self.update_label.setText(f"Update available: v{info.version}")
-        UpdateDialog(info, self).exec()
+        # Download the new installer QUIETLY in the background. It is applied
+        # silently when the user closes the app (see closeEvent) -- no popups,
+        # no progress, no interruption. They just get the new version next time.
+        self.update_label.setText("")
+        self._dl_worker = UpdateDownloadWorker(info)
+        self._dl_worker.ready.connect(self._on_update_downloaded)
+        self._dl_worker.failed.connect(lambda _m: None)   # silent: retry next launch
+        self._dl_thread = run_on_thread(self._dl_worker)
+
+    def _on_update_downloaded(self, path: str) -> None:
+        if self._dl_thread:
+            self._dl_thread.quit()
+        self._pending_installer = path
+        self.update_label.setText("An update will be applied automatically.")
+
+    def closeEvent(self, event) -> None:
+        # Apply a downloaded update silently as the app closes (installs in the
+        # background; the user reopens to the new version with nothing to see).
+        if self._pending_installer and updater.is_frozen():
+            try:
+                updater.launch_installer_silent(self._pending_installer)
+            except Exception:
+                pass
+        super().closeEvent(event)
 
     # -- state ----------------------------------------------------------------
     def _checkboxes(self):
@@ -325,6 +412,7 @@ class MainWindow(QWidget):
     def _refresh_buttons(self) -> None:
         has_file = bool(self._path)
         self.analyze_btn.setEnabled(has_file and not self._busy)
+        self.custom_btn.setEnabled(has_file and not self._busy)
         self.browse_btn.setEnabled(not self._busy)
         self.open_wb_btn.setEnabled(has_file and not self._busy)
         self.open_folder_btn.setEnabled(has_file and not self._busy)

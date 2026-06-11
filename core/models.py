@@ -112,6 +112,28 @@ class TableProfile:
         """Meaningful measures for tiles/stats: values first, then percents."""
         return self.value_measures + self.percent_measures
 
+    def column(self, name: str) -> Optional[ColumnProfile]:
+        for c in self.columns:
+            if c.name == name:
+                return c
+        return None
+
+    def measures_for(self, names: list[str]) -> list[ColumnProfile]:
+        """Chosen measures (preserving the given order), or auto key_measures."""
+        if names:
+            chosen = [self.column(n) for n in names]
+            chosen = [c for c in chosen if c is not None and c.is_measure]
+            if chosen:
+                return chosen
+        return self.key_measures
+
+    def value_for(self, name: Optional[str]) -> Optional[ColumnProfile]:
+        if name:
+            c = self.column(name)
+            if c is not None and c.is_value:
+                return c
+        return self.primary_value_measure
+
     @property
     def dimensions(self) -> list[ColumnProfile]:
         # categorical dimensions (dates handled separately for grouping)
@@ -165,6 +187,9 @@ class WorkbookProfile:
     warnings: list[str] = field(default_factory=list)
     # Sheets that already contain a PivotTable -- detected and left untouched.
     pivot_sheets: list[str] = field(default_factory=list)
+    # Set in Custom mode so the KPI/Dashboard/Summary sheets use the user's picks.
+    preferred_value_name: Optional[str] = None
+    preferred_measure_names: list[str] = field(default_factory=list)
 
     @property
     def primary(self) -> Optional[TableProfile]:
@@ -174,12 +199,36 @@ class WorkbookProfile:
 
 
 @dataclass
+class MeasureChoice:
+    """A value column the user chose to analyze, with a display format."""
+    name: str
+    # 'auto' | 'number' | 'usd' | 'lbp' | 'percent'
+    format_kind: str = "auto"
+
+
+@dataclass
+class CustomSelection:
+    """User-driven selection from the Custom Generate wizard."""
+    sheet_name: Optional[str] = None
+    dimensions: list[str] = field(default_factory=list)        # singles (one pivot each)
+    measures: list[MeasureChoice] = field(default_factory=list)
+    # Each inner list is a set of titles to nest into ONE combined pivot
+    # (period x titles, Sum + % of total). The singles above are still produced.
+    combinations: list[list[str]] = field(default_factory=list)
+
+    def is_valid(self) -> bool:
+        return bool(self.measures)
+
+
+@dataclass
 class AnalysisOptions:
     """Which analyses the user asked for (mirrors the UI checkboxes)."""
     dashboard: bool = True
     pivot: bool = True
     kpi: bool = True
     executive_summary: bool = True
+    # When set, the Custom Generate wizard drives the pivots/measures.
+    custom: Optional["CustomSelection"] = None
 
     def any_selected(self) -> bool:
         return any((self.dashboard, self.pivot, self.kpi, self.executive_summary))

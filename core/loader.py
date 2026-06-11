@@ -12,6 +12,7 @@ per sheet and treat the biggest overall as the workbook's primary table.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import os
 from typing import Any, Optional
 
@@ -28,24 +29,20 @@ def _cell_is_empty(v: Any) -> bool:
     return v is None or (isinstance(v, str) and v.strip() == "")
 
 
-def _detect_header_row(ws, min_row: int, max_row: int,
-                       min_col: int, max_col: int) -> Optional[int]:
-    """Return the 1-based row that best looks like a header, or None."""
-    best_row = None
-    for r in range(min_row, min(max_row, min_row + 25) + 1):
-        cells = [ws.cell(row=r, column=c).value for c in range(min_col, max_col + 1)]
-        non_empty = [c for c in cells if not _cell_is_empty(c)]
-        if len(non_empty) < max(2, (max_col - min_col + 1) * 0.5):
+def _detect_header_grid(grid: list[list[Any]], ncols: int) -> Optional[int]:
+    """Find the header row (0-based index into ``grid``) from in-memory values."""
+    need = max(2, ncols * 0.5)
+    limit = min(len(grid), 25)
+    for r in range(limit):
+        non_empty = [v for v in grid[r] if not _cell_is_empty(v)]
+        if len(non_empty) < need:
             continue
-        text_like = sum(1 for c in non_empty if isinstance(c, str))
+        text_like = sum(1 for v in non_empty if isinstance(v, str))
         # A header row is mostly strings, and the row below it has some data.
         if text_like >= len(non_empty) * 0.6:
-            below = [ws.cell(row=r + 1, column=c).value
-                     for c in range(min_col, max_col + 1)]
-            if any(not _cell_is_empty(c) for c in below):
-                best_row = r
-                break
-    return best_row
+            if r + 1 < len(grid) and any(not _cell_is_empty(v) for v in grid[r + 1]):
+                return r
+    return None
 
 
 def _dedupe_headers(raw: list[Any], min_col: int) -> list[str]:
@@ -64,49 +61,65 @@ def _dedupe_headers(raw: list[Any], min_col: int) -> list[str]:
 
 
 def _extract_table(ws) -> Optional[TableProfile]:
-    if ws.max_row is None or ws.max_row < 2:
-        return None
-    min_col, max_col = 1, ws.max_column or 1
-    min_row, max_row = 1, ws.max_row or 1
+    """Stream the sheet ONCE (O(rows)) and build a profiled table.
 
-    header_row = _detect_header_row(ws, min_row, max_row, min_col, max_col)
-    if header_row is None:
+    openpyxl read-only mode re-streams from the top on every ``ws.cell()`` call,
+    which is O(rows²). Iterating with ``ws.iter_rows()`` a single time avoids that
+    and keeps loading fast even for large sheets.
+    """
+    grid: list[list[Any]] = []
+    fmt_by_col: dict[int, str] = {}   # 1-based col index -> source number format
+    ncols = 0
+    for row_cells in ws.iter_rows():
+        vals: list[Any] = []
+        for idx, cell in enumerate(row_cells, start=1):
+            v = cell.value
+            vals.append(v)
+            # Capture the format from the first numeric/date cell of each column
+            # (skip header text), so currency/percent detection is data-driven.
+            if (idx not in fmt_by_col
+                    and isinstance(v, (int, float, _dt.date, _dt.datetime))
+                    and not isinstance(v, bool)):
+                fmt_by_col[idx] = getattr(cell, "number_format", "General") or "General"
+        if len(vals) > ncols:
+            ncols = len(vals)
+        grid.append(vals)
+
+    if len(grid) < 2 or ncols == 0:
+        return None
+    for vals in grid:                 # pad ragged rows to a uniform width
+        if len(vals) < ncols:
+            vals.extend([None] * (ncols - len(vals)))
+
+    hidx = _detect_header_grid(grid, ncols)
+    if hidx is None:
         return None
 
-    raw_headers = [ws.cell(row=header_row, column=c).value
-                   for c in range(min_col, max_col + 1)]
-    # Trim trailing empty header columns.
+    raw_headers = list(grid[hidx][:ncols])
     while raw_headers and _cell_is_empty(raw_headers[-1]):
         raw_headers.pop()
-        max_col -= 1
     if not raw_headers:
         return None
-    names = _dedupe_headers(raw_headers, min_col)
+    ncols = len(raw_headers)
+    names = _dedupe_headers(raw_headers, 1)
 
     rows: list[dict[str, Any]] = []
-    # Capture the number format of each column from the first data cell that has one.
-    fmt_by_name: dict[str, str] = {}
-    last_data_row = header_row
-    for r in range(header_row + 1, max_row + 1):
-        cells = [ws.cell(row=r, column=c) for c in range(min_col, max_col + 1)]
-        values = [c.value for c in cells]
+    last_data = hidx
+    for r in range(hidx + 1, len(grid)):
+        values = grid[r][:ncols]
         if all(_cell_is_empty(v) for v in values):
             continue
-        for i, cell in enumerate(cells):
-            nm = names[i]
-            if nm not in fmt_by_name and not _cell_is_empty(cell.value):
-                fmt = getattr(cell, "number_format", "General") or "General"
-                fmt_by_name[nm] = fmt
-        rows.append({names[i]: values[i] for i in range(len(names))})
-        last_data_row = r
-
+        rows.append({names[i]: values[i] for i in range(ncols)})
+        last_data = r
     if not rows:
         return None
 
+    fmt_by_name = {names[i]: fmt_by_col.get(i + 1, "General") for i in range(ncols)}
+
     table = TableProfile(
-        sheet_name=ws.title, header_row=header_row,
-        first_data_row=header_row + 1, last_data_row=last_data_row,
-        first_col=min_col, last_col=max_col, rows=rows,
+        sheet_name=ws.title, header_row=hidx + 1,
+        first_data_row=hidx + 2, last_data_row=last_data + 1,
+        first_col=1, last_col=ncols, rows=rows,
     )
     profile_table(table, fmt_by_name)   # formats drive currency/percent detection
     return table

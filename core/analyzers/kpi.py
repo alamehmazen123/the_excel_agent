@@ -34,10 +34,12 @@ class KpiAnalyzer(Analyzer):
             subheading=f"Source: {table.sheet_name}  •  {table.row_count:,} records",
         )
 
-        # Headline tiles: record count + total/avg of up to 3 key measures.
+        # Headline tiles: record count + total/avg of up to 3 key measures
+        # (the user's Custom picks when provided, else auto).
         spec.kpi_tiles.append(KpiTile("Total Records", f"{table.row_count:,}"))
         date_cols = table.date_columns
-        for measure in (table.key_measures or table.measures)[:3]:
+        tile_measures = table.measures_for(profile.preferred_measure_names) or table.measures
+        for measure in tile_measures[:3]:
             total = measure.total or 0.0
             tile = KpiTile(
                 label=f"Total {measure.name}",

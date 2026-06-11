@@ -38,6 +38,12 @@ class SettingsDialog(QDialog):
         info.setWordWrap(True)
         layout.addWidget(info)
 
+        warn = QLabel("⚠  DO NOT CHANGE, unless you are aware of what you are "
+                      "doing (have a new key).")
+        warn.setObjectName("WarnLabel")
+        warn.setWordWrap(True)
+        layout.addWidget(warn)
+
         form = QFormLayout()
         form.setSpacing(10)
 

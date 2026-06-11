@@ -52,15 +52,16 @@ class DashboardAnalyzer(Analyzer):
                 ],
             ))
 
-        # Headline KPI tiles.
+        # Headline KPI tiles (honor Custom picks when provided).
         spec.kpi_tiles.append(KpiTile("Records", f"{table.row_count:,}"))
-        for m in table.key_measures[:3]:
+        tile_measures = table.measures_for(profile.preferred_measure_names)
+        for m in tile_measures[:3]:
             spec.kpi_tiles.append(KpiTile(
                 f"Total {m.name}", fmt_measure(m, m.total or 0.0),
                 caption=f"avg {fmt_measure(m, m.mean or 0.0)}",
             ))
 
-        measure = table.primary_value_measure or table.key_measures[0]
+        measure = table.value_for(profile.preferred_value_name) or tile_measures[0]
 
         # Chart 1: top categories (bar) for the leading dimension.
         if table.dimensions:

@@ -54,6 +54,6 @@ Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
-; Launch after install AND after a silent auto-update (no skipifsilent flag,
-; so the in-app updater that runs Setup /SILENT will relaunch the app).
-Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall
+; Launch only after an INTERACTIVE (fresh) install. Silent background updates
+; happen when the user closes the app, so they must NOT relaunch it.
+Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
