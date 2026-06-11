@@ -43,21 +43,25 @@ echo  Built: Output\ExcelIntelligenceAgent-Setup.exe  (v%APPVER%)
 echo ============================================
 
 REM 4) Publish to GitHub Releases so installed apps auto-update on next launch.
-where gh >nul 2>&1
-if errorlevel 1 (
+REM Find gh even if it isn't on PATH (e.g. installed in this same session).
+set "GHEXE="
+where gh >nul 2>&1 && set "GHEXE=gh"
+if not defined GHEXE if exist "%ProgramFiles%\GitHub CLI\gh.exe" set "GHEXE=%ProgramFiles%\GitHub CLI\gh.exe"
+if not defined GHEXE if exist "%LOCALAPPDATA%\Programs\GitHub CLI\gh.exe" set "GHEXE=%LOCALAPPDATA%\Programs\GitHub CLI\gh.exe"
+if not defined GHEXE (
   echo.
   echo  gh CLI not found -- skipping auto-publish.
-  echo  To enable one-click auto-update for colleagues:
-  echo     winget install GitHub.cli   then   gh auth login
+  echo  Install once:  winget install GitHub.cli   then   gh auth login
   echo  Or upload Output\ExcelIntelligenceAgent-Setup.exe to a new GitHub Release manually.
   goto :done
 )
 echo Publishing release v%APPVER% to GitHub...
-gh release create v%APPVER% "Output\ExcelIntelligenceAgent-Setup.exe" --title "v%APPVER%" --notes "Update to v%APPVER%"
+"%GHEXE%" release create v%APPVER% "Output\ExcelIntelligenceAgent-Setup.exe" --title "v%APPVER%" --notes "Update to v%APPVER%" --repo alamehmazen123/the_excel_agent
 if errorlevel 1 (
   echo.
-  echo  Publish failed. Run 'gh auth login' once, then re-run build.bat,
-  echo  or upload Output\ExcelIntelligenceAgent-Setup.exe to GitHub Releases manually.
+  echo  Publish failed -- most likely you are not logged in yet.
+  echo  Run this once:   "%GHEXE%" auth login
+  echo  then re-run build.bat. Or upload the Setup.exe to GitHub Releases manually.
   goto :done
 )
 echo.
