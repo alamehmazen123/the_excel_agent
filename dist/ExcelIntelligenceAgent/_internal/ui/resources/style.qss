@@ -101,6 +101,7 @@ QLineEdit:focus, QComboBox:focus { border-color: #2E5496; }
 QLabel#StatusLabel { color: #6B7280; font-size: 13px; }
 QLabel#FooterLabel { color: #9AA3B2; font-size: 11px; }
 QLabel#HintLabel { color: #8A93A3; font-size: 11px; }
+QLabel#DescLabel { color: #0070C0; font-size: 11px; font-style: italic; }
 QLabel#WarnLabel {
     color: #9A3412; background-color: #FFF4E5;
     border: 1px solid #F5C26B; border-radius: 6px;

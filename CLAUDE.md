@@ -19,7 +19,74 @@ Summary, Smart Tables** — to the *same* workbook, leaving the original data sh
   built by automating Excel via COM). Without Excel it falls back to static tables.
 - The user must never see Python, a terminal, PowerShell, or a config file.
 
-Current version is in `config.py` → `APP_VERSION` (currently `1.10.0`).
+Current version is in `config.py` → `APP_VERSION` (currently `1.12.0`).
+
+### v1.12.0 — the intelligence layer (semantic read + insight engine + Insights sheet)
+The big upgrade from "aggregates everything" to "reasons about what matters".
+Three new pure-`core/` layers feed a new headline sheet:
+
+- **Semantic layer (`core/semantic.py`).** Adds *meaning* on top of the
+  profiler's *shape*: `classify_metric` tags each money/numeric/percent column as
+  `MetricKind` (REVENUE / COST / BALANCE / VOLUME / RATIO / AMOUNT / GENERIC),
+  and `analyze()` builds a `SemanticModel` (with `primary_money`, `revenue`,
+  `cost`, `balance` accessors) and detects a `ReportType`
+  (FINANCIAL / RECEIVABLES / CENSUS / OPERATIONS / GENERIC). Keyword banks match
+  BOTH the raw header and its library meaning, so it works decoded or not.
+  Everything falls back to GENERIC — never errors.
+- **Insight engine (`core/insights/`).** `detect_insights(profile, semantic)`
+  returns ranked, typed `Insight` objects from explainable statistics — NO
+  training data, runs offline on one workbook: period-over-period **variance**
+  (with the top driver), Pareto **concentration**, MAD/z-score **anomaly**,
+  least-squares **trend + one-step forecast**, receivables **ageing** buckets
+  (0–30/31–60/61–90/90+), and negative-record **losses**. Each carries a
+  `Severity` (HIGH/WATCH/INFO), a 0–1 `score`, `good` (RAG), and `evidence`
+  (driver, buckets, items, series) used to build charts. Detectors are wrapped so
+  one failure can't sink the run; findings are de-duped and severity-ranked.
+- **Insights sheet (`core/analyzers/insights.py`, `SHEET_INSIGHTS`).** The new
+  FIRST tab (`writer._move_insights_first` moves it to index 0). Renders a RAG
+  **KPI scorecard**, a **Bottom Line**, ranked **"What to look at"**, amber
+  **Risks**, red **Recommended actions** (derived from the insight kinds), a
+  **Findings** Smart Table (priority · finding · measure · impact, with a data
+  bar on impact), plus a **Pareto** chart (bars + cumulative-% line on a
+  secondary axis) and a **trend + forecast** line. Always produces something —
+  shows "stable, keep monitoring" when nothing material is found.
+- **Smart Tables 2.0 rendering (`render.DataTable.bar_columns` /
+  `scale_columns`).** `writer._apply_table_visuals` adds openpyxl **data bars**
+  and green→red **color-scale heatmaps** to chosen columns. Smart Tables put a
+  bar on each value column; the Insights findings table bars the impact score.
+- **Charts (`render.ChartKind.PARETO` / `COMBO`, `ChartSpec.line_values`).** The
+  writer renders a true Pareto/combo as a `BarChart` with a `LineChart` overlay
+  on an independent secondary axis. All chart work is **openpyxl** so it renders
+  WITH OR WITHOUT Excel (matches the product's offline-fallback philosophy). A
+  native Excel **waterfall** is the one deferred COM-only enhancement.
+- **Wiring.** `AnalysisOptions.insights` (default True), `_all_analyzers` /
+  `_selected_analyzers` put `InsightsAnalyzer` first, the pipeline captures
+  `AnalysisResult.insights`, and the UI gains an **Insights** checkbox + shows the
+  top finding in the completion dialog. Tests: `tests/test_insights.py`
+  (semantic classification, variance/concentration detection, ranking, empties).
+
+### v1.11.0 — library everywhere, LBP default, date-grouped scenarios
+- **Library on every sheet (not just Smart Tables).** After profiling, the engine
+  detects code columns the library can decode and injects HIDDEN decoded-name
+  helper columns (`<CODE> (Name)`) onto the data sheet (`core/decode.py` +
+  `writer.inject_hidden_helpers`). Originals are untouched; the result `notes`
+  list the hidden columns. Code columns are then grouped BY the helper, so the
+  real PivotTables, Dashboard, KPI, Summary and Smart Tables all show real names.
+  `ColumnProfile.decoded_helper` / `is_decoded_helper` carry this through the
+  model; `TableProfile.dimensions`/`pivot_dimensions` skip the raw-code column.
+- **LBP is the currency default.** `formatting.is_dollar_column` (shared with
+  `pivot_plan`) → money is `… LBP` unless the column is explicitly dollars
+  (`USD`/`$`). Fixes KPI/Dashboard tiles that previously showed `$` on LBP.
+  `render.NumberFormat.LBP` (`#,##0" LBP"`) added for tables.
+- **BASIC RULE: never a pivot/smart table without a date.** `pivot_plan` nests the
+  date (Month/Year) as the OUTER row field on every category pivot; Smart Tables
+  and the static Pivot fallback group by month (`aggregate.group_period_dim`).
+- **Smart Tables is a scenario generator** (`analyzers/smart_tables.py`): many
+  tables (≤14) — each readable dimension × value measure, month-grouped, decoded,
+  in LBP. Appears only when a helper was actually injected.
+- **Custom wizard shows the library description** per title
+  (`Engine.describe_columns` adds `description`; `ui/custom_dialog` renders it).
+- **Output Mode adds a "Smart Tables" checkbox** (`ui/main_window`).
 
 ---
 

@@ -15,13 +15,16 @@ class ChartKind(str, Enum):
     BAR = "bar"
     LINE = "line"
     PIE = "pie"
+    PARETO = "pareto"     # bars (value) + cumulative % line on a secondary axis
+    COMBO = "combo"       # bars (actual) + line (trend/forecast) overlay
 
 
 class NumberFormat(str, Enum):
     GENERAL = "general"
     INTEGER = "integer"
     DECIMAL = "decimal"
-    CURRENCY = "currency"
+    CURRENCY = "currency"     # US dollars ("$#,##0.00")
+    LBP = "lbp"               # Lebanese Pounds ("#,##0 LBP") — the hospital default
     PERCENT = "percent"
     DATE = "date"
 
@@ -41,6 +44,10 @@ class DataTable:
     rows: list[list[Any]]
     # Per-column number formats (len == len(headers)); GENERAL if omitted.
     formats: list[NumberFormat] = field(default_factory=list)
+    # Smart-table visuals (0-based column indices): in-cell gradient data bars,
+    # and a green→red color scale (heatmap). Empty = plain table.
+    bar_columns: list[int] = field(default_factory=list)
+    scale_columns: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -50,6 +57,9 @@ class ChartSpec:
     categories: list[Any]            # x-axis / slice labels
     series_name: str
     values: list[float]
+    # Optional overlay line for PARETO (cumulative %) / COMBO (trend/forecast).
+    line_values: Optional[list[float]] = None
+    line_name: str = ""
 
 
 @dataclass

@@ -791,7 +791,7 @@
    'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\keyring-25.7.0.dist-info\\top_level.txt',
    'DATA'),
   ('libcrypto-3-x64.dll',
-   'C:\\Program Files\\Git\\mingw64\\bin\\libcrypto-3-x64.dll',
+   'C:\\Program Files\\Memurai\\libcrypto-3-x64.dll',
    'BINARY'),
   ('libcrypto-3.dll',
    'C:\\Users\\DR '
@@ -802,7 +802,7 @@
    'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\libffi-8.dll',
    'BINARY'),
   ('libssl-3-x64.dll',
-   'C:\\Program Files\\Git\\mingw64\\bin\\libssl-3-x64.dll',
+   'C:\\Program Files\\Memurai\\libssl-3-x64.dll',
    'BINARY'),
   ('libssl-3.dll',
    'C:\\Users\\DR '

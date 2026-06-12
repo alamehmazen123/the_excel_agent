@@ -44,6 +44,12 @@ class ColumnProfile:
     total: Optional[float] = None
     # For categorical/date columns: list of (value, count), most frequent first
     top_values: list[tuple[Any, int]] = field(default_factory=list)
+    # When the library can decode this code column, the name of the hidden helper
+    # column holding the decoded names. Such code columns are then grouped BY the
+    # helper (readable names) instead of by raw codes.
+    decoded_helper: Optional[str] = None
+    # True for the hidden helper columns the engine injects (decoded names).
+    is_decoded_helper: bool = False
 
     @property
     def is_measure(self) -> bool:
@@ -136,8 +142,11 @@ class TableProfile:
 
     @property
     def dimensions(self) -> list[ColumnProfile]:
-        # categorical dimensions (dates handled separately for grouping)
-        return [c for c in self.columns if c.ctype == ColumnType.CATEGORICAL]
+        # categorical dimensions (dates handled separately for grouping).
+        # A code column with a decoded helper is replaced by grouping on the
+        # helper, so skip the raw-code column here.
+        return [c for c in self.columns
+                if c.ctype == ColumnType.CATEGORICAL and c.decoded_helper is None]
 
     @property
     def pivot_dimensions(self) -> list[ColumnProfile]:
@@ -155,6 +164,10 @@ class TableProfile:
             if c.ctype not in (ColumnType.CATEGORICAL, ColumnType.TEXT):
                 continue
             if c.distinct < 2:
+                continue
+            # Skip raw-code columns that have a decoded helper: we group by the
+            # readable helper column instead.
+            if c.decoded_helper is not None:
                 continue
             ratio = c.distinct / max(1, c.count)
             if ratio > 0.95:
@@ -223,6 +236,9 @@ class CustomSelection:
 @dataclass
 class AnalysisOptions:
     """Which analyses the user asked for (mirrors the UI checkboxes)."""
+    # The Insights sheet is the headline briefing (semantic layer + insight
+    # engine). On by default — it's the product's smartest output.
+    insights: bool = True
     dashboard: bool = True
     pivot: bool = True
     kpi: bool = True
@@ -236,7 +252,7 @@ class AnalysisOptions:
     add_dollar: bool = False
 
     def any_selected(self) -> bool:
-        return any((self.dashboard, self.pivot, self.kpi,
+        return any((self.insights, self.dashboard, self.pivot, self.kpi,
                     self.executive_summary, self.smart_tables))
 
 
@@ -247,6 +263,9 @@ class AnalysisResult:
     warnings: list[str] = field(default_factory=list)
     summary_used_llm: bool = False
     notes: list[str] = field(default_factory=list)
+    # The ranked Insight objects surfaced on the Insights sheet (loosely typed to
+    # avoid a models→insights import cycle); the UI can show a headline from these.
+    insights: list = field(default_factory=list)
 
 
 # A progress callback: (fraction 0.0-1.0, human-readable status message).

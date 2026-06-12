@@ -3563,12 +3563,17 @@ imported by:
  &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
  &#8226;   <a href="#core.constants">core.constants</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.excel_com">core.excel_com</a>
  &#8226;   <a href="#core.formatting">core.formatting</a>
+ &#8226;   <a href="#core.insights">core.insights</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
  &#8226;   <a href="#core.library">core.library</a>
  &#8226;   <a href="#core.library.store">core.library.store</a>
  &#8226;   <a href="#core.llm.groq_client">core.llm.groq_client</a>
@@ -3580,6 +3585,7 @@ imported by:
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
  &#8226;   <a href="#core.profiler">core.profiler</a>
  &#8226;   <a href="#core.render">core.render</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
  &#8226;   <a href="#core.updater">core.updater</a>
  &#8226;   <a href="#core.writer">core.writer</a>
  &#8226;   <a href="#cryptography">cryptography</a>
@@ -7976,8 +7982,9 @@ imported by:
  &#8226;   <a href="#configparser">configparser</a>
  &#8226;   <a href="#contextlib">contextlib</a>
  &#8226;   <a href="#core.aggregate">core.aggregate</a>
- &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.excel_com">core.excel_com</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
  &#8226;   <a href="#core.profiler">core.profiler</a>
  &#8226;   <a href="#difflib">difflib</a>
  &#8226;   <a href="#dis">dis</a>
@@ -8702,8 +8709,10 @@ imported by:
     <a href="#core.aggregate">core.aggregate</a>
  &#8226;   <a href="#core.analyzers">core.analyzers</a>
  &#8226;   <a href="#core.constants">core.constants</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.excel_com">core.excel_com</a>
  &#8226;   <a href="#core.formatting">core.formatting</a>
+ &#8226;   <a href="#core.insights">core.insights</a>
  &#8226;   <a href="#core.library">core.library</a>
  &#8226;   <a href="#core.llm">core.llm</a>
  &#8226;   <a href="#core.loader">core.loader</a>
@@ -8713,6 +8722,7 @@ imported by:
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
  &#8226;   <a href="#core.profiler">core.profiler</a>
  &#8226;   <a href="#core.render">core.render</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
  &#8226;   <a href="#core.updater">core.updater</a>
  &#8226;   <a href="#core.writer">core.writer</a>
  &#8226;   <a href="#ui.app">ui.app</a>
@@ -8740,8 +8750,11 @@ imports:
 imported by:
     <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
+ &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
 
   </div>
@@ -8761,6 +8774,7 @@ imported by:
     <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
@@ -8786,6 +8800,7 @@ imports:
 imported by:
     <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
@@ -8845,6 +8860,33 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="core.analyzers.insights"></a>
+  <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/analyzers/insights.py" type="text/plain"><tt>core.analyzers.insights</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#core.aggregate">core.aggregate</a>
+ &#8226;   <a href="#core.analyzers">core.analyzers</a>
+ &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
+ &#8226;   <a href="#core.constants">core.constants</a>
+ &#8226;   <a href="#core.formatting">core.formatting</a>
+ &#8226;   <a href="#core.insights">core.insights</a>
+ &#8226;   <a href="#core.library">core.library</a>
+ &#8226;   <a href="#core.models">core.models</a>
+ &#8226;   <a href="#core.render">core.render</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.pipeline">core.pipeline</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="core.analyzers.kpi"></a>
   <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/analyzers/kpi.py" type="text/plain"><tt>core.analyzers.kpi</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -8878,6 +8920,7 @@ imports:
  &#8226;   <a href="#core.analyzers">core.analyzers</a>
  &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.constants">core.constants</a>
+ &#8226;   <a href="#core.formatting">core.formatting</a>
  &#8226;   <a href="#core.models">core.models</a>
  &#8226;   <a href="#core.render">core.render</a>
  &#8226;   <a href="#typing">typing</a>
@@ -8897,10 +8940,11 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#__future__">__future__</a>
- &#8226;   <a href="#collections">collections</a>
+ &#8226;   <a href="#core.aggregate">core.aggregate</a>
  &#8226;   <a href="#core.analyzers">core.analyzers</a>
  &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.constants">core.constants</a>
+ &#8226;   <a href="#core.formatting">core.formatting</a>
  &#8226;   <a href="#core.library">core.library</a>
  &#8226;   <a href="#core.models">core.models</a>
  &#8226;   <a href="#core.render">core.render</a>
@@ -8928,6 +8972,7 @@ imports:
 imported by:
     <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
@@ -8936,6 +8981,28 @@ imported by:
  &#8226;   <a href="#core.pipeline">core.pipeline</a>
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
  &#8226;   <a href="#core.writer">core.writer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.decode"></a>
+  <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/decode.py" type="text/plain"><tt>core.decode</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#collections">collections</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.library">core.library</a>
+ &#8226;   <a href="#core.models">core.models</a>
+ &#8226;   <a href="#dataclasses">dataclasses</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.pipeline">core.pipeline</a>
 
   </div>
 
@@ -8981,7 +9048,80 @@ imports:
 imported by:
     <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
+ &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
+ &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.insights"></a>
+  <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/insights/__init__.py" type="text/plain"><tt>core.insights</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.analyzers.insights">core.analyzers.insights</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.insights.engine"></a>
+  <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/insights/engine.py" type="text/plain"><tt>core.insights.engine</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#collections">collections</a>
+ &#8226;   <a href="#core.aggregate">core.aggregate</a>
+ &#8226;   <a href="#core.formatting">core.formatting</a>
+ &#8226;   <a href="#core.insights">core.insights</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
+ &#8226;   <a href="#core.models">core.models</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
+ &#8226;   <a href="#datetime">datetime</a>
+ &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.insights">core.insights</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.insights.models"></a>
+  <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/insights/models.py" type="text/plain"><tt>core.insights.models</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#core.insights">core.insights</a>
+ &#8226;   <a href="#dataclasses">dataclasses</a>
+ &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.insights">core.insights</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
 
   </div>
 
@@ -8999,8 +9139,11 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+    <a href="#core.analyzers.insights">core.analyzers.insights</a>
+ &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.library.store">core.library.store</a>
+ &#8226;   <a href="#core.pipeline">core.pipeline</a>
 
   </div>
 
@@ -9130,15 +9273,19 @@ imported by:
  &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.excel_com">core.excel_com</a>
  &#8226;   <a href="#core.formatting">core.formatting</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
  &#8226;   <a href="#core.loader">core.loader</a>
  &#8226;   <a href="#core.pipeline">core.pipeline</a>
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
  &#8226;   <a href="#core.profiler">core.profiler</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
  &#8226;   <a href="#ui.custom_dialog">ui.custom_dialog</a>
  &#8226;   <a href="#ui.main_window">ui.main_window</a>
  &#8226;   <a href="#ui.worker">ui.worker</a>
@@ -9157,11 +9304,14 @@ imports:
  &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
  &#8226;   <a href="#core.constants">core.constants</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.excel_com">core.excel_com</a>
+ &#8226;   <a href="#core.library">core.library</a>
  &#8226;   <a href="#core.loader">core.loader</a>
  &#8226;   <a href="#core.models">core.models</a>
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
@@ -9261,10 +9411,34 @@ imported by:
     <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
  &#8226;   <a href="#core.writer">core.writer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.semantic"></a>
+  <a target="code" href="///C:/Users/DR%20MAZEN/Desktop/the_excel_agent/core/semantic.py" type="text/plain"><tt>core.semantic</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.formatting">core.formatting</a>
+ &#8226;   <a href="#core.models">core.models</a>
+ &#8226;   <a href="#dataclasses">dataclasses</a>
+ &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.analyzers.insights">core.analyzers.insights</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
 
   </div>
 
@@ -9310,6 +9484,7 @@ imports:
  &#8226;   <a href="#openpyxl">openpyxl</a>
  &#8226;   <a href="#openpyxl.chart">openpyxl.chart</a>
  &#8226;   <a href="#openpyxl.chart.label">openpyxl.chart.label</a>
+ &#8226;   <a href="#openpyxl.formatting.rule">openpyxl.formatting.rule</a>
  &#8226;   <a href="#openpyxl.styles">openpyxl.styles</a>
  &#8226;   <a href="#openpyxl.utils">openpyxl.utils</a>
  &#8226;   <a href="#openpyxl.worksheet.table">openpyxl.worksheet.table</a>
@@ -10327,10 +10502,13 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#core.library.store">core.library.store</a>
+    <a href="#core.decode">core.decode</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
+ &#8226;   <a href="#core.library.store">core.library.store</a>
  &#8226;   <a href="#core.models">core.models</a>
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
  &#8226;   <a href="#core.render">core.render</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
  &#8226;   <a href="#core.updater">core.updater</a>
  &#8226;   <a href="#h11._events">h11._events</a>
  &#8226;   <a href="#more_itertools.recipes">more_itertools.recipes</a>
@@ -10378,6 +10556,7 @@ imported by:
  &#8226;   <a href="#_strptime">_strptime</a>
  &#8226;   <a href="#calendar">calendar</a>
  &#8226;   <a href="#core.aggregate">core.aggregate</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
  &#8226;   <a href="#core.library.store">core.library.store</a>
  &#8226;   <a href="#core.loader">core.loader</a>
  &#8226;   <a href="#core.profiler">core.profiler</a>
@@ -14923,8 +15102,10 @@ imported by:
  &#8226;   <a href="#asyncio.runners">asyncio.runners</a>
  &#8226;   <a href="#asyncio.sslproto">asyncio.sslproto</a>
  &#8226;   <a href="#asyncio.timeouts">asyncio.timeouts</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
  &#8226;   <a href="#core.models">core.models</a>
  &#8226;   <a href="#core.render">core.render</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
  &#8226;   <a href="#cryptography.utils">cryptography.utils</a>
  &#8226;   <a href="#http">http</a>
  &#8226;   <a href="#inspect">inspect</a>
@@ -16342,6 +16523,7 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
+ &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -16516,6 +16698,7 @@ imported by:
  &#8226;   <a href="#cffi.verifier">cffi.verifier</a>
  &#8226;   <a href="#ctypes.util">ctypes.util</a>
  &#8226;   <a href="#imp">imp</a>
+ &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#packaging.tags">packaging.tags</a>
@@ -20771,6 +20954,7 @@ imported by:
  &#8226;   <a href="#PIL.TiffImagePlugin">PIL.TiffImagePlugin</a>
  &#8226;   <a href="#_pydecimal">_pydecimal</a>
  &#8226;   <a href="#asyncio.windows_events">asyncio.windows_events</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
  &#8226;   <a href="#cryptography.hazmat.primitives.asymmetric.rsa">cryptography.hazmat.primitives.asymmetric.rsa</a>
  &#8226;   <a href="#datetime">datetime</a>
  &#8226;   <a href="#fractions">fractions</a>
@@ -30958,7 +31142,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#openpyxl.formatting">openpyxl.formatting</a>
+    <a href="#core.writer">core.writer</a>
+ &#8226;   <a href="#openpyxl.formatting">openpyxl.formatting</a>
  &#8226;   <a href="#openpyxl.formatting.formatting">openpyxl.formatting.formatting</a>
 
   </div>
@@ -46171,10 +46356,14 @@ imported by:
  &#8226;   <a href="#core.analyzers.base">core.analyzers.base</a>
  &#8226;   <a href="#core.analyzers.dashboard">core.analyzers.dashboard</a>
  &#8226;   <a href="#core.analyzers.executive_summary">core.analyzers.executive_summary</a>
+ &#8226;   <a href="#core.analyzers.insights">core.analyzers.insights</a>
  &#8226;   <a href="#core.analyzers.kpi">core.analyzers.kpi</a>
  &#8226;   <a href="#core.analyzers.pivot">core.analyzers.pivot</a>
  &#8226;   <a href="#core.analyzers.smart_tables">core.analyzers.smart_tables</a>
+ &#8226;   <a href="#core.decode">core.decode</a>
  &#8226;   <a href="#core.excel_com">core.excel_com</a>
+ &#8226;   <a href="#core.insights.engine">core.insights.engine</a>
+ &#8226;   <a href="#core.insights.models">core.insights.models</a>
  &#8226;   <a href="#core.library.store">core.library.store</a>
  &#8226;   <a href="#core.llm.groq_client">core.llm.groq_client</a>
  &#8226;   <a href="#core.llm.prompts">core.llm.prompts</a>
@@ -46184,6 +46373,7 @@ imported by:
  &#8226;   <a href="#core.pivot_plan">core.pivot_plan</a>
  &#8226;   <a href="#core.profiler">core.profiler</a>
  &#8226;   <a href="#core.render">core.render</a>
+ &#8226;   <a href="#core.semantic">core.semantic</a>
  &#8226;   <a href="#core.updater">core.updater</a>
  &#8226;   <a href="#core.writer">core.writer</a>
  &#8226;   <a href="#cryptography.exceptions">cryptography.exceptions</a>

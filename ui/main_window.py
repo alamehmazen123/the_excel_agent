@@ -134,16 +134,24 @@ class MainWindow(QWidget):
         opt.addWidget(self._section("Output Mode"))
         grid = QGridLayout()
         grid.setHorizontalSpacing(40)
+        self.cb_insights = QCheckBox("Insights  (smart briefing)")
+        self.cb_insights.setToolTip(
+            "The headline sheet: auto-detected findings, a KPI scorecard with "
+            "red/amber/green status, and Pareto / trend charts.")
         self.cb_dashboard = QCheckBox("Dashboard")
         self.cb_pivot = QCheckBox("Pivot Analysis")
         self.cb_kpi = QCheckBox("KPI Analysis")
         self.cb_summary = QCheckBox("Executive Summary")
-        for cb in (self.cb_dashboard, self.cb_pivot, self.cb_kpi, self.cb_summary):
+        self.cb_smart = QCheckBox("Smart Tables")
+        for cb in (self.cb_insights, self.cb_dashboard, self.cb_pivot,
+                   self.cb_kpi, self.cb_summary, self.cb_smart):
             cb.setChecked(True)
-        grid.addWidget(self.cb_dashboard, 0, 0)
-        grid.addWidget(self.cb_pivot, 0, 1)
-        grid.addWidget(self.cb_kpi, 1, 0)
-        grid.addWidget(self.cb_summary, 1, 1)
+        grid.addWidget(self.cb_insights, 0, 0)
+        grid.addWidget(self.cb_dashboard, 0, 1)
+        grid.addWidget(self.cb_pivot, 1, 0)
+        grid.addWidget(self.cb_kpi, 1, 1)
+        grid.addWidget(self.cb_summary, 2, 0)
+        grid.addWidget(self.cb_smart, 2, 1)
         opt.addLayout(grid)
         root.addWidget(opt_card)
 
@@ -263,8 +271,10 @@ class MainWindow(QWidget):
                 cb.setEnabled(True)
             return
         mapping = {
+            "insights": self.cb_insights,
             "dashboard": self.cb_dashboard, "pivot": self.cb_pivot,
             "kpi": self.cb_kpi, "executive_summary": self.cb_summary,
+            "smart_tables": self.cb_smart,
         }
         n_tables = len(profile.tables)
         for key, cb in mapping.items():
@@ -283,10 +293,12 @@ class MainWindow(QWidget):
 
     def _selected_options(self) -> AnalysisOptions:
         return AnalysisOptions(
+            insights=self.cb_insights.isChecked(),
             dashboard=self.cb_dashboard.isChecked(),
             pivot=self.cb_pivot.isChecked(),
             kpi=self.cb_kpi.isChecked(),
             executive_summary=self.cb_summary.isChecked(),
+            smart_tables=self.cb_smart.isChecked(),
         )
 
     def _analyze(self) -> None:
@@ -346,6 +358,11 @@ class MainWindow(QWidget):
         ai = "AI-written" if result.summary_used_llm else "auto-generated"
         msg = (f"Done. Added {len(result.sheets_created)} sheet(s):\n"
                f"  • " + "\n  • ".join(result.sheets_created))
+        # Lead with the single most important finding from the Insights engine.
+        top = getattr(result, "insights", None)
+        if top:
+            head = top[0]
+            msg += f"\n\nTop insight:  {getattr(head, 'title', '')}."
         if any("Executive Summary" in s for s in result.sheets_created):
             msg += f"\n\nExecutive Summary: {ai}."
         for note in result.notes:
@@ -418,7 +435,8 @@ class MainWindow(QWidget):
 
     # -- state ----------------------------------------------------------------
     def _checkboxes(self):
-        return (self.cb_dashboard, self.cb_pivot, self.cb_kpi, self.cb_summary)
+        return (self.cb_insights, self.cb_dashboard, self.cb_pivot, self.cb_kpi,
+                self.cb_summary, self.cb_smart)
 
     def _set_busy(self, busy: bool) -> None:
         self._busy = busy

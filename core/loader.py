@@ -103,6 +103,13 @@ def _extract_table(ws) -> Optional[TableProfile]:
     ncols = len(raw_headers)
     names = _dedupe_headers(raw_headers, 1)
 
+    # Ignore hidden decoded-name helper columns from a previous run so they are
+    # never re-profiled, re-decoded, or duplicated. They are regenerated fresh.
+    drop = {i for i, n in enumerate(names) if n.endswith(" (Name)")}
+    if drop:
+        names = [n for i, n in enumerate(names) if i not in drop]
+        ncols = len(names)
+
     rows: list[dict[str, Any]] = []
     last_data = hidx
     for r in range(hidx + 1, len(grid)):

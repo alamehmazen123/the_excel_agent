@@ -207,6 +207,10 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection,
                               [d.name], dfs, group_date_field=d.name))
 
     # Each categorical dimension x each chosen measure.
+    # BASIC RULE: nest the date (Month/Year) as the OUTER row field whenever a
+    # date dimension is available, so no category pivot is dateless.
+    cust_date = date_dims[0].name if date_dims else None
+    cust_prefix = f"{cust_date} (Month/Year) & " if cust_date else ""
     for d in cat_dims:
         wide = TableProfile.is_wide_dimension(d)
         for (col, fmt, role, cap) in resolved:
@@ -214,8 +218,10 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection,
             data = (value_fields(col, fmt, cap, add_dollar) if role == "value"
                     else [DataFieldSpec(col.name, XL_SUM, cap, fmt)])
             plan.append(PivotSpec(
-                SHEET_PIVOT, f"{col.name} by {d.name}", [d.name],
+                SHEET_PIVOT, f"{col.name} by {cust_prefix}{d.name}",
+                ([cust_date] if cust_date else []) + [d.name],
                 data,
+                group_date_field=cust_date,
                 ordered_labels=ordered,
                 visible_items=ordered[:TOP_N] if wide else None))
 
@@ -299,35 +305,33 @@ def build_pivot_plan(profile: WorkbookProfile,
                                   [d.name], dfs, group_date_field=d.name))
 
     # --- per groupable dimension: total value ($) and total percent (%) ------
+    # BASIC RULE: never build a category pivot WITHOUT a date. When a date column
+    # exists it is nested as the OUTER row field (grouped Month/Year); category
+    # pivots are only produced dateless if the workbook truly has no date column.
+    primary_date = dates[0].name if dates else None
+    date_prefix = f"{primary_date} (Month/Year) & " if primary_date else ""
+
+    def _rows(dim_name: str) -> list[str]:
+        return ([primary_date] if primary_date else []) + [dim_name]
+
     for dim in dims:
         wide = TableProfile.is_wide_dimension(dim)
         if value is not None:
             ordered = _ranked_labels(table, dim, value)
             plan.append(PivotSpec(
-                SHEET_PIVOT, f"{value.name} by {dim.name}", [dim.name],
+                SHEET_PIVOT, f"{value.name} by {date_prefix}{dim.name}",
+                _rows(dim.name),
                 value_fields(value, vfmt, value_caption, add_dollar),
+                group_date_field=primary_date,
                 ordered_labels=ordered,
                 visible_items=ordered[:TOP_N] if wide else None))
         if pct is not None:
             pct_caption = f"Total {pct.name}"
             ordered = _ranked_labels(table, dim, pct)
             plan.append(PivotSpec(
-                SHEET_PIVOT, f"{pct.name} by {dim.name}", [dim.name],
+                SHEET_PIVOT, f"{pct.name} by {date_prefix}{dim.name}",
+                _rows(dim.name),
                 [DataFieldSpec(pct.name, XL_SUM, pct_caption, _percent_format(pct))],
-                ordered_labels=ordered,
-                visible_items=ordered[:TOP_N] if wide else None))
-
-    # --- date x dimension breakdowns (e.g. month/year x STRATEGY SOURCE) -----
-    if dates and value is not None:
-        primary_date = dates[0].name
-        for dim in dims[:MAX_CROSS_DIMS]:
-            wide = TableProfile.is_wide_dimension(dim)
-            ordered = _ranked_labels(table, dim, value)
-            plan.append(PivotSpec(
-                SHEET_PIVOT,
-                f"{value.name} by {dates[0].name} (Month/Year) & {dim.name}",
-                [primary_date, dim.name],
-                [DataFieldSpec(value.name, XL_SUM, value_caption, vfmt)],
                 group_date_field=primary_date,
                 ordered_labels=ordered,
                 visible_items=ordered[:TOP_N] if wide else None))

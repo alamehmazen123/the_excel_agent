@@ -5,7 +5,10 @@ analyzer emits a SheetSpec, so they are fast and deterministic.
 """
 from __future__ import annotations
 
+import datetime as _dt
+
 from core.analyzers.smart_tables import SmartTablesAnalyzer
+from core.decode import apply_to_profile, find_decodable
 from core.library.store import CodeMap, HeaderEntry, Library
 from core.models import (ColumnProfile, ColumnType, TableProfile,
                          WorkbookProfile)
@@ -44,34 +47,63 @@ def _profile_with_codes() -> WorkbookProfile:
     col_dept.top_values = [(1, 2), (2, 1), (3, 1)]
     col_val = ColumnProfile(name="Revenue", index=1, ctype=ColumnType.CURRENCY,
                             count=4, total=400.0)
+    # A date column is now required (BASIC RULE: every smart table is grouped by
+    # month) — two months so the grouping is exercised.
+    col_date = ColumnProfile(name="Date", index=2, ctype=ColumnType.DATE, count=4)
+    jan, feb = _dt.datetime(2026, 1, 5), _dt.datetime(2026, 2, 9)
     table = TableProfile(
         sheet_name="Data", header_row=1, first_data_row=2, last_data_row=5,
-        first_col=1, last_col=2, columns=[col_dept, col_val],
+        first_col=1, last_col=3, columns=[col_dept, col_val, col_date],
         rows=[
-            {"DEPT": 1, "Revenue": 100.0},
-            {"DEPT": 1, "Revenue": 150.0},
-            {"DEPT": 2, "Revenue": 90.0},
-            {"DEPT": 3, "Revenue": 60.0},
+            {"DEPT": 1, "Revenue": 100.0, "Date": jan},
+            {"DEPT": 1, "Revenue": 150.0, "Date": feb},
+            {"DEPT": 2, "Revenue": 90.0, "Date": jan},
+            {"DEPT": 3, "Revenue": 60.0, "Date": feb},
         ],
     )
     return WorkbookProfile(path="x.xlsx", sheet_names=["Data"], tables=[table])
 
 
 def test_smart_tables_decodes_and_groups() -> None:
-    analyzer = SmartTablesAnalyzer(library=_library())
+    lib = _library()
     profile = _profile_with_codes()
-    assert analyzer.applies_to(profile)
+    # The pipeline injects decoded helper columns before analyzers run.
+    table = profile.primary
+    apply_to_profile(table, find_decodable(table, lib), lib)
+
+    analyzer = SmartTablesAnalyzer(library=lib)
+    assert analyzer.applies_to(profile)            # a helper now exists
     spec = analyzer.run(profile)
     assert spec is not None and spec.tables
-    table = spec.tables[0]
-    assert "Department" in table.title          # decoded header meaning
-    labels = [r[0] for r in table.rows]
+
+    # A table grouped by month & the decoded DEPT names should exist.
+    decoded = [t for t in spec.tables if "DEPT (Name)" in t.title]
+    assert decoded, [t.title for t in spec.tables]
+    labels = [r[1] for r in decoded[0].rows]       # col 1 = decoded dimension
     assert "Cardiology" in labels and "001" not in labels
-    # Cardiology (100+150=250) ranks first.
-    assert table.rows[0][0] == "Cardiology"
-    assert abs(table.rows[0][1] - 250.0) < 1e-9
+    assert all("-" in str(r[0]) for r in decoded[0].rows)   # month label like 'Jan-26'
 
 
 def test_empty_library_does_not_apply() -> None:
     analyzer = SmartTablesAnalyzer(library=Library())
     assert not analyzer.applies_to(_profile_with_codes())
+
+
+def test_currency_defaults_to_lbp() -> None:
+    from core.formatting import fmt_measure
+    lbp = ColumnProfile(name="ORG_AMOUNT", index=0, ctype=ColumnType.CURRENCY)
+    usd = ColumnProfile(name="USD", index=1, ctype=ColumnType.CURRENCY)
+    assert fmt_measure(lbp, 1_500_000).endswith(" LBP")
+    assert fmt_measure(usd, 1_500_000).startswith("$")
+
+
+def test_every_pivot_is_date_grouped() -> None:
+    from core.pivot_plan import build_pivot_plan
+    from core.constants import SHEET_PIVOT
+    profile = _profile_with_codes()           # has Date + DEPT + Revenue
+    plan = build_pivot_plan(profile)
+    cat_pivots = [p for p in plan if p.target_sheet == SHEET_PIVOT]
+    assert cat_pivots
+    # BASIC RULE: when a date column exists, no category pivot is dateless.
+    assert all(p.group_date_field for p in cat_pivots), \
+        [p.title for p in cat_pivots if not p.group_date_field]

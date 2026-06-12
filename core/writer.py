@@ -13,6 +13,7 @@ from typing import Optional
 from openpyxl import load_workbook
 from openpyxl.chart import BarChart, LineChart, PieChart, Reference
 from openpyxl.chart.label import DataLabelList
+from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -40,6 +41,7 @@ _NUMFMT = {
     NumberFormat.INTEGER: "#,##0",
     NumberFormat.DECIMAL: "#,##0.00",
     NumberFormat.CURRENCY: "$#,##0.00",
+    NumberFormat.LBP: '#,##0" LBP"',
     NumberFormat.PERCENT: "0.0%",
     NumberFormat.DATE: "yyyy-mm-dd",
 }
@@ -145,7 +147,44 @@ def _write_table(ws: Worksheet, table: DataTable, row: int) -> tuple[int, dict]:
         "header_row": header_row, "first_data": first_data,
         "last_data": row - 1, "n_cols": n_cols,
     }
+    _apply_table_visuals(ws, table, info)
     return row + 1, info
+
+
+# Data-bar / color-scale palette (Smart Tables 2.0).
+_BAR_COLOR = "5B9BD5"        # soft blue gradient bar
+_SCALE_LOW = "F8696B"        # red (low)
+_SCALE_MID = "FFEB84"        # amber (mid)
+_SCALE_HIGH = "63BE7B"       # green (high)
+
+
+def _apply_table_visuals(ws: Worksheet, table: DataTable, info: dict) -> None:
+    """Add in-cell data bars and/or a green→red color scale to chosen columns,
+    so totals read at a glance without opening a chart."""
+    if info["last_data"] < info["first_data"]:
+        return
+    for idx in getattr(table, "bar_columns", []):
+        if not 0 <= idx < info["n_cols"]:
+            continue
+        col = get_column_letter(idx + 1)
+        rng = f"{col}{info['first_data']}:{col}{info['last_data']}"
+        try:
+            ws.conditional_formatting.add(rng, DataBarRule(
+                start_type="min", end_type="max", color=_BAR_COLOR))
+        except Exception:
+            pass
+    for idx in getattr(table, "scale_columns", []):
+        if not 0 <= idx < info["n_cols"]:
+            continue
+        col = get_column_letter(idx + 1)
+        rng = f"{col}{info['first_data']}:{col}{info['last_data']}"
+        try:
+            ws.conditional_formatting.add(rng, ColorScaleRule(
+                start_type="min", start_color=_SCALE_LOW,
+                mid_type="percentile", mid_value=50, mid_color=_SCALE_MID,
+                end_type="max", end_color=_SCALE_HIGH))
+        except Exception:
+            pass
 
 
 def _add_chart(ws: Worksheet, chart: ChartSpec, anchor: str,
@@ -162,7 +201,16 @@ def _add_chart(ws: Worksheet, chart: ChartSpec, anchor: str,
     if n == 0:
         return
 
-    if chart.kind == ChartKind.BAR:
+    # Pareto / combo carry an overlay line in columns L (12); write it too.
+    line_col = 12
+    has_line = chart.kind in (ChartKind.PARETO, ChartKind.COMBO) and chart.line_values
+    if has_line:
+        ws.cell(row=data_start_row, column=line_col,
+                value=chart.line_name or "Cumulative %")
+        for i, lv in enumerate(chart.line_values, start=1):
+            ws.cell(row=data_start_row + i, column=line_col, value=lv)
+
+    if chart.kind in (ChartKind.BAR, ChartKind.PARETO, ChartKind.COMBO):
         ch = BarChart(); ch.type = "col"
     elif chart.kind == ChartKind.LINE:
         ch = LineChart()
@@ -197,6 +245,20 @@ def _add_chart(ws: Worksheet, chart: ChartSpec, anchor: str,
         ch.dataLabels.showCatName = False
         ch.dataLabels.showLegendKey = False
         ch.dataLabels.dLblPos = "outEnd"
+
+    # Overlay a line on a secondary axis for Pareto (cumulative %) / combo (trend).
+    if has_line:
+        line = LineChart()
+        line_ref = Reference(ws, min_col=line_col, min_row=data_start_row,
+                             max_row=data_start_row + len(chart.line_values))
+        line.add_data(line_ref, titles_from_data=True)
+        line.set_categories(cats_ref)
+        # Put the line on its own axis so its scale (e.g. 0-100%) is independent.
+        line.y_axis.axId = 200
+        line.y_axis.crosses = "max"
+        ch.y_axis.crosses = "autoZero"
+        ch += line
+        ch.legend = None
     ws.add_chart(ch, anchor)
 
 
@@ -300,6 +362,56 @@ def render_sheet(wb, spec: SheetSpec) -> str:
     return name
 
 
+_HELPER_SUFFIX = " (Name)"
+
+
+def inject_hidden_helpers(wb, table, decodes, library) -> list[str]:
+    """Write decoded-name helper columns (HIDDEN) next to their code columns on
+    the data sheet. Idempotent: an existing same-named helper column is reused
+    and overwritten rather than duplicated. Returns the helper names written.
+
+    Decoding is done by reading each code cell straight from the sheet, so it is
+    robust to the loader having skipped blank rows (no index-alignment needed).
+    """
+    if not decodes:
+        return []
+    ws = wb[table.sheet_name] if table.sheet_name in wb.sheetnames else None
+    if ws is None:
+        return []
+
+    header_row = table.header_row
+    # Map existing header text -> column index so re-runs overwrite in place.
+    existing: dict[str, int] = {}
+    max_used = 0
+    for col in range(1, ws.max_column + 1):
+        val = ws.cell(row=header_row, column=col).value
+        if val is not None and str(val) != "":
+            max_used = col
+            existing[str(val)] = col
+    next_col = max_used + 1
+
+    written: list[str] = []
+    for dc in decodes:
+        src_idx = existing.get(dc.source_name)
+        if src_idx is None:
+            # Source column not located on the sheet -> skip safely.
+            continue
+        target_col = existing.get(dc.helper_name)
+        if target_col is None:
+            target_col = next_col
+            next_col += 1
+        # Header + decoded values for every data row on the sheet.
+        ws.cell(row=header_row, column=target_col, value=dc.helper_name)
+        for r in range(table.first_data_row, table.last_data_row + 1):
+            raw = ws.cell(row=r, column=src_idx).value
+            name = library.decode(dc.cmap_name, raw) if raw not in (None, "") else None
+            ws.cell(row=r, column=target_col, value=name)
+        ws.column_dimensions[get_column_letter(target_col)].hidden = True
+        existing[dc.helper_name] = target_col
+        written.append(dc.helper_name)
+    return written
+
+
 def _atomic_save(wb, source_path: str) -> None:
     folder = os.path.dirname(os.path.abspath(source_path))
     fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=folder)
@@ -314,20 +426,47 @@ def _atomic_save(wb, source_path: str) -> None:
         raise
 
 
-def write_results(source_path: str, specs: list[SheetSpec]) -> list[str]:
+def write_results(source_path: str, specs: list[SheetSpec],
+                  inject: Optional[tuple] = None) -> list[str]:
     """Regenerate the analysis sheets (removes prior output sheets first).
 
-    Returns the list of created sheet names. Original data sheets are untouched.
+    ``inject`` (optional) is ``(table, decodes, library)``: hidden decoded-name
+    helper columns are written onto the data sheet so every analysis (incl. the
+    active PivotTables built afterwards) can group by readable names. Original
+    columns are never modified — only new hidden columns are appended.
+
+    Returns the list of created sheet names.
     """
     try:
         wb = load_workbook(source_path)   # full fidelity (keeps formulas/values)
     except Exception as exc:
         raise ValueError(f"Could not open workbook for writing: {exc}") from exc
 
+    if inject is not None:
+        table, decodes, library = inject
+        try:
+            inject_hidden_helpers(wb, table, decodes, library)
+        except Exception:
+            pass   # decoration is best-effort; never block sheet creation
+
     _remove_existing_outputs(wb)
     created = [render_sheet(wb, s) for s in specs if s is not None]
+    _move_insights_first(wb)
     _atomic_save(wb, source_path)
     return created
+
+
+def _move_insights_first(wb) -> None:
+    """Put the Insights sheet at the front so it's the first tab leadership sees.
+    Tab order only — sheet contents (including the original data) are untouched."""
+    from .constants import SHEET_INSIGHTS  # noqa: PLC0415
+    for ws in wb.worksheets:
+        if ws.title.split(" (")[0] == SHEET_INSIGHTS:
+            try:
+                wb.move_sheet(ws, -wb.worksheets.index(ws))
+            except Exception:
+                pass
+            break
 
 
 def append_sheets(source_path: str, specs: list[SheetSpec]) -> list[str]:
