@@ -52,6 +52,31 @@ def time_series(table: TableProfile, date_col: ColumnProfile,
     return sorted(totals.items(), key=lambda kv: kv[0])
 
 
+def group_period_dim(table: TableProfile, date_col: ColumnProfile,
+                     dim: ColumnProfile, measure: ColumnProfile,
+                     top_n: int = 40) -> list[tuple[str, str, float, int]]:
+    """Sum ``measure`` and count rows by (Year-Month period, dim value).
+
+    Returns the top ``top_n`` (period, label, total, count) tuples ranked by
+    total descending, then re-sorted chronologically for readable display. This
+    backs the date-grouped Smart Tables (BASIC RULE: every table carries a date).
+    """
+    totals: dict[tuple[str, str], float] = defaultdict(float)
+    counts: dict[tuple[str, str], int] = defaultdict(int)
+    for row in table.rows:
+        period = _period_key(row.get(date_col.name))
+        key = row.get(dim.name)
+        val = _num(row.get(measure.name))
+        if period is None or key is None or key == "" or val is None:
+            continue
+        k = (period, str(key))
+        totals[k] += val
+        counts[k] += 1
+    top = sorted(totals.items(), key=lambda kv: abs(kv[1]), reverse=True)[:top_n]
+    top.sort(key=lambda kv: (kv[0][0], -kv[1]))   # chronological, value desc
+    return [(p, label, tot, counts[(p, label)]) for (p, label), tot in top]
+
+
 def period_over_period_growth(series: list[tuple[str, float]]) -> Optional[float]:
     """Return fractional growth between the last two periods, or None."""
     if len(series) < 2:

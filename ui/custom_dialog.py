@@ -146,7 +146,14 @@ class CustomWizardDialog(QDialog):
             h.setContentsMargins(0, 0, 0, 0)
             cb = QCheckBox(d["name"])
             cb.setChecked(bool(d.get("recommended")))
+            if d.get("description"):
+                cb.setToolTip(d["description"])
             h.addWidget(cb)
+            # Library description (real meaning) shown next to the title.
+            if d.get("description"):
+                desc = QLabel(f"— {d['description']}")
+                desc.setObjectName("DescLabel")
+                h.addWidget(desc)
             badge = QLabel(f"{d['kind']} · {d['detail']}")
             badge.setObjectName("HintLabel")
             h.addWidget(badge)
@@ -160,7 +167,13 @@ class CustomWizardDialog(QDialog):
             h.setContentsMargins(0, 0, 0, 0)
             cb = QCheckBox(m["name"])
             cb.setChecked(bool(m.get("recommended")))
+            if m.get("description"):
+                cb.setToolTip(m["description"])
             h.addWidget(cb)
+            if m.get("description"):
+                desc = QLabel(f"— {m['description']}")
+                desc.setObjectName("DescLabel")
+                h.addWidget(desc)
             h.addStretch(1)
             combo = QComboBox()
             for label, _kind in _FORMATS:

@@ -10,10 +10,11 @@ from typing import Optional
 from .analyzers.base import Analyzer
 from .analyzers.dashboard import DashboardAnalyzer
 from .analyzers.executive_summary import ExecutiveSummaryAnalyzer, Narrator
+from .analyzers.insights import InsightsAnalyzer
 from .analyzers.kpi import KpiAnalyzer
 from .analyzers.pivot import PivotAnalyzer
 from .analyzers.smart_tables import SmartTablesAnalyzer
-from .constants import SHEET_KPI, SHEET_PIVOT
+from .constants import SHEET_INSIGHTS, SHEET_KPI, SHEET_PIVOT
 from .excel_com import ExcelFinalizer, excel_available
 from .loader import load_workbook_profile
 from .pivot_plan import build_pivot_plan
@@ -45,6 +46,14 @@ class Engine:
         measures of the chosen table, with a recommended pre-selection.
         """
         from .models import ColumnType  # noqa: PLC0415
+        from .library import get_library  # noqa: PLC0415
+        lib = get_library()
+
+        def _describe(name: str) -> str:
+            """Library meaning of a header, or '' if it adds nothing."""
+            meaning = lib.meaning_of(name)
+            return meaning if meaning and meaning != name else ""
+
         sheets = [t.sheet_name for t in profile.tables]
         table = None
         if sheet_name:
@@ -63,12 +72,14 @@ class Engine:
             else:
                 kind, detail = "category", f"{c.distinct} values"
             dims.append({"name": c.name, "kind": kind, "detail": detail,
+                         "description": _describe(c.name),
                          "recommended": c.name in recommended_dims})
         # dates are also offered as dimensions (grouped) -> include any not already
         for c in table.date_columns:
             if not any(d["name"] == c.name for d in dims):
                 dims.append({"name": c.name, "kind": "date",
-                             "detail": "grouped by month/year", "recommended": True})
+                             "detail": "grouped by month/year",
+                             "description": _describe(c.name), "recommended": True})
 
         rec_measures = {c.name for c in table.key_measures[:3]}
         measures = []
@@ -76,6 +87,7 @@ class Engine:
             unit = ("percent" if c.ctype == ColumnType.PERCENT
                     else "currency" if c.ctype == ColumnType.CURRENCY else "number")
             measures.append({"name": c.name, "unit": unit,
+                             "description": _describe(c.name),
                              "recommended": c.name in rec_measures})
         return {"sheets": sheets, "sheet": table.sheet_name,
                 "dimensions": dims, "measures": measures}
@@ -106,11 +118,23 @@ class Engine:
                      profile.primary.column(m.name).is_value)), None)
 
         progress(0.20, "Detecting tables and column types…")
+
+        # Library decoding: detect code columns the reference library can decode
+        # and inject hidden decoded-name helper columns so EVERY sheet (tiles,
+        # dashboard, pivots, smart tables, summary) groups by readable names.
+        from .decode import find_decodable, apply_to_profile  # noqa: PLC0415
+        from .library import get_library  # noqa: PLC0415
+        library = get_library()
+        decodes = find_decodable(profile.primary, library) if profile.primary else []
+        if decodes:
+            apply_to_profile(profile.primary, decodes, library)
+
         use_com = excel_available()
         analyzers = self._selected_analyzers(options, use_com)
 
         specs = []
         summary_analyzer: Optional[ExecutiveSummaryAnalyzer] = None
+        insights_analyzer: Optional[InsightsAnalyzer] = None
         total = len(analyzers)
         for i, analyzer in enumerate(analyzers):
             frac = 0.20 + 0.50 * (i / max(1, total))
@@ -126,6 +150,8 @@ class Engine:
                 specs.append(spec)
             if isinstance(analyzer, ExecutiveSummaryAnalyzer):
                 summary_analyzer = analyzer
+            if isinstance(analyzer, InsightsAnalyzer):
+                insights_analyzer = analyzer
 
         if not specs and not (use_com and options.pivot):
             raise ValueError(
@@ -134,13 +160,22 @@ class Engine:
             )
 
         progress(0.72, "Writing sheets into workbook…")
-        created = write_results(workbook_path, specs)
+        inject = (profile.primary, decodes, library) if decodes else None
+        created = write_results(workbook_path, specs, inject=inject)
 
         result = AnalysisResult(
             output_path=workbook_path,
             sheets_created=created,
             warnings=list(profile.warnings),
         )
+        if insights_analyzer is not None:
+            result.insights = insights_analyzer.insights
+        if decodes:
+            helpers = ", ".join(f"'{d.helper_name}'" for d in decodes)
+            result.notes.append(
+                f"Added {len(decodes)} HIDDEN helper column(s) of decoded names "
+                f"to '{profile.primary.sheet_name}' ({helpers}). Original columns "
+                "are unchanged; unhide them in Excel to see the decoded names.")
 
         com_pivots = 0
         if use_com:
@@ -185,6 +220,7 @@ class Engine:
     # -- analyzer wiring ------------------------------------------------------
     def _all_analyzers(self) -> list[Analyzer]:
         return [
+            InsightsAnalyzer(),
             DashboardAnalyzer(),
             PivotAnalyzer(),
             KpiAnalyzer(),
@@ -195,6 +231,9 @@ class Engine:
     def _selected_analyzers(self, options: AnalysisOptions,
                             use_com: bool = False) -> list[Analyzer]:
         chosen: list[Analyzer] = []
+        if options.insights:
+            # First so the Insights sheet renders before everything else.
+            chosen.append(InsightsAnalyzer())
         if options.kpi:
             # With Excel, KPI stats/date tables become real pivots (built by the
             # COM finalizer), so the KPI sheet only needs its headline tiles.

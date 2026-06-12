@@ -1,31 +1,44 @@
-"""Smart Tables analyzer: library-decoded summary tables (no pivots).
+"""Smart Tables analyzer: library-decoded, date-grouped summary tables.
 
 Unlike the Pivot Analysis sheet (real Excel PivotTables) this analyzer emits
 plain, formatted DataTables rendered by openpyxl. Its value comes from the
 :mod:`core.library` brain: code columns (guarantor / department / supplier /
-doctor ...) are decoded from cryptic codes to real names, and abbreviated
-headers are expanded to their real meaning, so the hospital sees readable
-breakdowns like "Total Revenue by Department" with named departments.
+account …) are decoded from cryptic codes to real names via the hidden helper
+columns the engine injects, abbreviated headers are expanded to their meaning,
+and money is shown in Lebanese Pounds (the hospital default).
 
-When the library is empty the analyzer does not apply, so the sheet simply does
-not appear until reference files have been ingested.
+It is a SCENARIO GENERATOR: many tables covering each readable dimension against
+each value measure, always grouped by Year/Month (BASIC RULE: never a table
+without a date). When the library is empty or the data has no date column, the
+analyzer does not apply, so the sheet simply does not appear.
 """
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Any, Optional
+from typing import Optional
 
+from ..aggregate import group_period_dim, time_series
 from ..constants import SHEET_SMART
+from ..formatting import is_dollar_column
 from ..library import Library, get_library
-from ..models import ColumnProfile, ColumnType, TableProfile, WorkbookProfile
+from ..models import ColumnProfile, TableProfile, WorkbookProfile
 from ..render import DataTable, NumberFormat, SheetSpec, TextBlock
 from .base import Analyzer
 
-# Don't build a breakdown wider than this many decoded groups.
-_MAX_GROUPS = 25
-# A column qualifies as a "code column" only if the library decodes at least
-# this fraction of its distinct values.
-_MIN_COVERAGE = 0.5
+# Keep the sheet readable: cap the number of scenario tables and rows per table.
+_MAX_TABLES = 14
+_ROWS_PER_TABLE = 30
+
+_MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _fmt_period(period: str) -> str:
+    """'2026-01' -> 'Jan-26'."""
+    try:
+        y, m = period.split("-")
+        return f"{_MONTHS[int(m)]}-{y[2:]}"
+    except Exception:
+        return period
 
 
 class SmartTablesAnalyzer(Analyzer):
@@ -33,7 +46,6 @@ class SmartTablesAnalyzer(Analyzer):
     sheet_name = SHEET_SMART
 
     def __init__(self, library: Optional[Library] = None) -> None:
-        # Injectable for tests; defaults to the cached on-disk library.
         self._library = library
 
     @property
@@ -44,44 +56,82 @@ class SmartTablesAnalyzer(Analyzer):
 
     def applies_to(self, profile: WorkbookProfile) -> bool:
         t = profile.primary
-        if not t or t.row_count == 0 or not t.value_measures:
+        if not t or t.row_count == 0 or not t.value_measures or not t.date_columns:
             return False
-        # Only meaningful once the library knows something this workbook uses.
-        return not self.library.is_empty and bool(self._decodable_columns(t))
+        if self.library.is_empty:
+            return False
+        # Only meaningful once the library has DECODED something in this workbook
+        # (a hidden helper column was injected). Otherwise the Pivot/Dashboard
+        # sheets already cover plain categorical breakdowns.
+        return any(c.is_decoded_helper for c in t.columns)
+
+    # -- internals ---------------------------------------------------------- #
+    def _dimensions(self, table: TableProfile) -> list[ColumnProfile]:
+        """Readable grouping columns: decoded helpers first, then plain
+        categoricals (already human-readable name columns)."""
+        helpers = [c for c in table.columns if c.is_decoded_helper]
+        cats = [c for c in table.dimensions if not c.is_decoded_helper]
+        return helpers + cats
+
+    def _fmt_for(self, measure: ColumnProfile) -> NumberFormat:
+        return (NumberFormat.CURRENCY if is_dollar_column(measure)
+                else NumberFormat.LBP)
 
     def run(self, profile: WorkbookProfile) -> Optional[SheetSpec]:
         table = profile.primary
-        if table is None:
-            return None
-        decodable = self._decodable_columns(table)
-        if not decodable:
+        if table is None or not table.date_columns or not table.value_measures:
             return None
 
-        measure = (table.value_for(profile.preferred_value_name)
-                   or table.primary_value_measure)
-        if measure is None:
-            return None
+        date_col = table.date_columns[0]
+        dims = self._dimensions(table)
+        chosen = table.measures_for(profile.preferred_measure_names)
+        value_measures = [m for m in chosen if m.is_value] or table.value_measures
 
         spec = SheetSpec(
             name=SHEET_SMART, heading="Smart Tables",
             subheading=(f"Source: {table.sheet_name}  •  {table.row_count:,} records"
-                        "  •  decoded via the reference library"),
+                        f"  •  decoded via the reference library, grouped by month"),
         )
 
-        for col, cmap_name in decodable:
-            title = self.library.meaning_of(col.name)
-            grouped = self._grouped_decoded(table, col, measure, cmap_name)
-            if not grouped:
+        produced = 0
+
+        # Scenario A: each value measure totalled by month (the time trend).
+        for m in value_measures[:2]:
+            series = time_series(table, date_col, m)
+            if not series:
                 continue
-            rows = [[label, round(total, 2), count]
-                    for label, total, count in grouped]
             spec.tables.append(DataTable(
-                title=f"Total {measure.name} by {title}",
-                headers=[title, f"Total {measure.name}", "Records"],
-                rows=rows,
-                formats=[NumberFormat.GENERAL, NumberFormat.DECIMAL,
-                         NumberFormat.INTEGER],
+                title=f"Total {self.library.meaning_of(m.name)} by {date_col.name} (Month)",
+                headers=[f"{date_col.name} (Month)", f"Total {m.name}"],
+                rows=[[_fmt_period(p), round(v, 2)] for p, v in series],
+                formats=[NumberFormat.GENERAL, self._fmt_for(m)],
+                bar_columns=[1],          # data bar on the monthly total
             ))
+            produced += 1
+
+        # Scenario B: each readable dimension x each value measure, month-grouped.
+        for dim in dims:
+            if produced >= _MAX_TABLES:
+                break
+            dim_title = self.library.meaning_of(dim.name)
+            for m in value_measures[:2]:
+                if produced >= _MAX_TABLES:
+                    break
+                rows = group_period_dim(table, date_col, dim, m,
+                                        top_n=_ROWS_PER_TABLE)
+                if not rows:
+                    continue
+                spec.tables.append(DataTable(
+                    title=f"Total {m.name} by {date_col.name} (Month) & {dim_title}",
+                    headers=[f"{date_col.name} (Month)", dim_title,
+                             f"Total {m.name}", "Records"],
+                    rows=[[_fmt_period(p), label, round(t, 2), c]
+                          for p, label, t, c in rows],
+                    formats=[NumberFormat.GENERAL, NumberFormat.GENERAL,
+                             self._fmt_for(m), NumberFormat.INTEGER],
+                    bar_columns=[2],          # data bar on the value total
+                ))
+                produced += 1
 
         if not spec.tables:
             return None
@@ -90,71 +140,21 @@ class SmartTablesAnalyzer(Analyzer):
             title="About these tables",
             paragraphs=[
                 "Codes are translated to their real names using the hospital "
-                "reference library. Tables are sorted by value, highest first.",
+                "reference library, money is shown in Lebanese Pounds (LBP), and "
+                "every table is grouped by month. Tables are sorted by value.",
             ],
             style="normal",
         ))
+
+        helpers = [c.name for c in table.columns if c.is_decoded_helper]
+        if helpers:
+            spec.text_blocks.append(TextBlock(
+                title="Hidden helper columns added by the agent",
+                paragraphs=[
+                    "To let the PivotTables and these tables show real names, the "
+                    "agent added these HIDDEN columns to the data sheet (originals "
+                    "untouched): " + ", ".join(helpers) + ".",
+                ],
+                style="highlight",
+            ))
         return spec
-
-    # -- internals ---------------------------------------------------------- #
-    def _decodable_columns(
-            self, table: TableProfile) -> list[tuple[ColumnProfile, str]]:
-        """Columns whose values the library can decode, with the map to use.
-
-        A column is matched either via its glossary category (header -> domain)
-        or by value-overlap auto-detection against every code map.
-        """
-        out: list[tuple[ColumnProfile, str]] = []
-        lib = self.library
-        for col in table.columns:
-            if col.ctype in (ColumnType.CURRENCY, ColumnType.PERCENT,
-                             ColumnType.DATE, ColumnType.EMPTY):
-                continue
-            # 1) Explicit: header is in the glossary with a category.
-            entry = lib.header(col.name)
-            if entry and entry.category:
-                cm = lib.map_for_category(entry.category)
-                if cm and cm.entries:
-                    out.append((col, cm.name))
-                    continue
-            # 2) Auto-detect by value overlap on this column's distinct values.
-            values = [v for v, _ in col.top_values] or self._distinct(table, col)
-            cm = lib.best_map_for_values(values, _MIN_COVERAGE)
-            if cm is not None:
-                out.append((col, cm.name))
-        return out
-
-    @staticmethod
-    def _distinct(table: TableProfile, col: ColumnProfile,
-                  limit: int = 50) -> list[Any]:
-        seen: list[Any] = []
-        uniq: set[str] = set()
-        for row in table.rows:
-            v = row.get(col.name)
-            k = str(v)
-            if v is None or k in uniq:
-                continue
-            uniq.add(k)
-            seen.append(v)
-            if len(seen) >= limit:
-                break
-        return seen
-
-    def _grouped_decoded(self, table: TableProfile, col: ColumnProfile,
-                         measure: ColumnProfile, cmap_name: str
-                         ) -> list[tuple[str, float, int]]:
-        """Sum ``measure`` and count rows by the DECODED value of ``col``."""
-        totals: dict[str, float] = defaultdict(float)
-        counts: dict[str, int] = defaultdict(int)
-        for row in table.rows:
-            raw = row.get(col.name)
-            if raw is None or raw == "":
-                continue
-            val = row.get(measure.name)
-            if not isinstance(val, (int, float)) or isinstance(val, bool):
-                continue
-            label = self.library.decode(cmap_name, raw)
-            totals[label] += float(val)
-            counts[label] += 1
-        ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
-        return [(k, v, counts[k]) for k, v in ranked[:_MAX_GROUPS]]
