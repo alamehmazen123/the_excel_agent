@@ -12,14 +12,14 @@ iterations to get right.
 A **standalone Windows desktop app** (PySide6) for non-technical business users at
 **Sahel General Hospital**. The user picks an Excel workbook, clicks a button, and the
 app appends analysis sheets — **Dashboard, Pivot Analysis, KPI Analysis, Executive
-Summary** — to the *same* workbook, leaving the original data sheet untouched.
+Summary, Smart Tables** — to the *same* workbook, leaving the original data sheet untouched.
 
 - Distributed as a per-user **installer**: `ExcelIntelligenceAgent-Setup.exe`.
 - Requires **Microsoft Excel installed** for the full feature set (real PivotTables are
   built by automating Excel via COM). Without Excel it falls back to static tables.
 - The user must never see Python, a terminal, PowerShell, or a config file.
 
-Current version is in `config.py` → `APP_VERSION` (e.g. `1.9.4`).
+Current version is in `config.py` → `APP_VERSION` (currently `1.10.0`).
 
 ---
 
@@ -237,6 +237,68 @@ Windows Credential Manager via `keyring`, `ui/settings_store.py`) take precedenc
 A diagnostic for "AI not working" on a colleague's PC: **Settings → Test Connection** shows the real
 error (network/firewall block of `api.groq.com`, invalid key, or rate limit). A working key returns
 "Connection successful."
+
+---
+
+## 8b. Reference library ("the brain") & Smart Tables
+
+A persistent reference store that teaches the engine the hospital's own vocabulary so
+the **Smart Tables** sheet (and, later, Executive Summary / KPI) produce hospital-relevant,
+decoded output. It is plain Python + JSON — **no UI imports, part of `core/`.**
+
+Layout (`core/library/`):
+- `store.py` — `Library` dataclass + `HeaderEntry` / `CodeMap`; tolerant lookup, `load/save`,
+  `get_library()` (process-cached). `data/*.json` holds the knowledge.
+- `ingest.py` — `ingest_excel(path, kind?, category?)` merges one reference workbook into the
+  library (incremental, idempotent). Auto-detects sheet kind; forgiving column heuristics.
+- `data/headers.json` — abbreviation glossary `{ABBREV: {meaning, category}}`.
+- `data/codes.json` — per-domain code maps `{domain: {label, entries:{code: definition}}}`.
+- `data/meta.json` — version + list of ingested sources.
+
+Two knowledge kinds:
+1. **Header glossary** — abbreviated header → real meaning (`ADTH → Date of Admission`),
+   optionally a `category` linking the column to a code domain.
+2. **Code maps** — one domain each (guarantor, department, supplier, doctor, …):
+   `code → definition` (`001 → Private patient`).
+
+**Tolerant matching** (`store.py`): codes normalize so `1`, `001`, `"001 "` all resolve
+(Excel often reads a code column as ints). A data column is matched to a code map either by
+its glossary `category` or by **value-overlap auto-detection** (`best_map_for_values`, ≥50%
+coverage). Headers match by normalized form, then alphanumeric-squashed fallback.
+
+**Smart Tables analyzer** (`core/analyzers/smart_tables.py`): emits plain openpyxl DataTables
+(NOT pivots, no COM), one "Total \<measure\> by \<decoded dimension\>" per decodable column.
+`applies_to()` returns **False while the library is empty**, so the sheet only appears once
+reference files are ingested — nothing breaks before then. Wired into `pipeline.py`
+(`_all_analyzers` / `_selected_analyzers`) and `AnalysisOptions.smart_tables` (default True).
+
+**Ingesting new files** (run per file the user sends; updates the committed JSON, which the
+next build ships to colleagues):
+```
+python tools/ingest_library.py "Headers Glossary.xlsx"                # auto-detected
+python tools/ingest_library.py "Guarantor Codes.xlsx" --kind codes --category guarantor
+python tools/ingest_library.py --show                                 # library stats
+```
+The JSON files are bundled via `build.spec` `datas`. Tests: `tests/test_library.py`.
+Column-name heuristics in `ingest.py` (`_*_HINTS`) may need tuning as real files arrive.
+
+**Populated library (v1.10.0).** The SAHEL reference set is now ingested (`data/*.json`):
+- **Header glossary:** 183 headers (`ACTTNUMB → Department Account Name`, `SRCC → Source Code`, …).
+- **`account` code map:** 2,687 chart-of-accounts codes (`101300100001 → Subscribed Capital (Called & Paid Up)`).
+- **`fld1` code map:** 961 entity/payer codes (`10001 → NATIONAL SOCIAL SECURITY`, `10003 → LEBANESE ARMY`, `30047 → BAHMAN HOSPITAL`).
+
+Ingested with explicit flags because both code files carry a banner header row
+(`Header : ACTTNUMB` / `HEADER : FLD1`):
+```
+python tools/ingest_library.py "HEADER library.xlsx" --kind headers
+python tools/ingest_library.py "HEADER subtabs account ....xlsx" --kind codes --category account
+python tools/ingest_library.py "HEADER subtabs ... FLD1 ....xlsx" --kind codes --category fld1
+```
+
+**Ingest gotcha fixed (`_ingest_codes_sheet`).** The FLD1 file's definition column is titled
+"Description of **codes** of this header"; the substring "codes" matched `_CODE_HINTS` and stole
+the code-column pick, collapsing code+definition onto one column (entries became `name → name`).
+A collision guard now falls back to first=code / second=definition when the two picks coincide.
 
 ---
 

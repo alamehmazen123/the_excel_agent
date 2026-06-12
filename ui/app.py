@@ -30,9 +30,13 @@ def _load_stylesheet() -> str:
     path = _resource_path("style.qss")
     try:
         with open(path, "r", encoding="utf-8") as fh:
-            return fh.read()
+            qss = fh.read()
     except OSError:
         return ""
+    # Qt can't resolve a relative url() inside a setStyleSheet string, so bake in
+    # the absolute path to the blue checkmark glyph (forward slashes for QSS).
+    check = _resource_path("check.svg").replace("\\", "/")
+    return qss.replace("__CHECK_SVG__", check)
 
 
 def run() -> int:

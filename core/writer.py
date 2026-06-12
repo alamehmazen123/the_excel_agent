@@ -300,25 +300,7 @@ def render_sheet(wb, spec: SheetSpec) -> str:
     return name
 
 
-def write_results(source_path: str, specs: list[SheetSpec]) -> list[str]:
-    """Append a sheet per spec to the workbook at ``source_path`` (atomic save).
-
-    Returns the list of created sheet names. Original sheets are untouched.
-    """
-    try:
-        wb = load_workbook(source_path)   # full fidelity (keeps formulas/values)
-    except Exception as exc:
-        raise ValueError(f"Could not open workbook for writing: {exc}") from exc
-
-    _remove_existing_outputs(wb)
-
-    created: list[str] = []
-    for spec in specs:
-        if spec is None:
-            continue
-        created.append(render_sheet(wb, spec))
-
-    # Atomic save: temp file in the same directory, then replace.
+def _atomic_save(wb, source_path: str) -> None:
     folder = os.path.dirname(os.path.abspath(source_path))
     fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=folder)
     os.close(fd)
@@ -330,4 +312,40 @@ def write_results(source_path: str, specs: list[SheetSpec]) -> list[str]:
         if os.path.exists(tmp):
             os.remove(tmp)
         raise
+
+
+def write_results(source_path: str, specs: list[SheetSpec]) -> list[str]:
+    """Regenerate the analysis sheets (removes prior output sheets first).
+
+    Returns the list of created sheet names. Original data sheets are untouched.
+    """
+    try:
+        wb = load_workbook(source_path)   # full fidelity (keeps formulas/values)
+    except Exception as exc:
+        raise ValueError(f"Could not open workbook for writing: {exc}") from exc
+
+    _remove_existing_outputs(wb)
+    created = [render_sheet(wb, s) for s in specs if s is not None]
+    _atomic_save(wb, source_path)
+    return created
+
+
+def append_sheets(source_path: str, specs: list[SheetSpec]) -> list[str]:
+    """Add sheets WITHOUT removing the other analysis sheets. Only a same-named
+    sheet (e.g. an empty 'Pivot Analysis' left by a failed Excel step) is
+    replaced. Used for the static pivot fallback so KPI/Dashboard/Summary stay."""
+    try:
+        wb = load_workbook(source_path)
+    except Exception as exc:
+        raise ValueError(f"Could not open workbook for writing: {exc}") from exc
+
+    created: list[str] = []
+    for spec in specs:
+        if spec is None:
+            continue
+        for ws in list(wb.worksheets):
+            if ws.title.split(" (")[0] == spec.name and len(wb.worksheets) > 1:
+                del wb[ws.title]
+        created.append(render_sheet(wb, spec))
+    _atomic_save(wb, source_path)
     return created

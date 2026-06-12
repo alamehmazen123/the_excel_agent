@@ -58,6 +58,7 @@ class ExcelFinalizer:
     def __init__(self) -> None:
         self.notes: list[str] = []
         self._pt_counter = 0
+        self.pivots_built = 0       # how many pivots were actually created
 
     # -- public ---------------------------------------------------------------
     def finalize(self, path: str, profile: WorkbookProfile,
@@ -67,32 +68,59 @@ class ExcelFinalizer:
         import win32com.client as win32  # noqa: PLC0415
 
         path = os.path.abspath(path)        # Excel COM requires an absolute path
+        self.pivots_built = 0
         pythoncom.CoInitialize()
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
         wb = None
+        saved = False
         try:
             skip_sheets = set(profile.pivot_sheets)
             wb = excel.Workbooks.Open(path)
             data_sheet = profile.primary.sheet_name if profile.primary else None
-            source_table = self._ensure_source_table(wb, profile)
+
+            source_table = None
+            try:
+                source_table = self._ensure_source_table(wb, profile)
+            except Exception as exc:                       # noqa: BLE001
+                self.notes.append(f"Could not prepare the source table: {exc}")
             src_name = source_table.Name if source_table is not None else ""
 
+            # Each step is isolated so one failure can't lose the rest, and we
+            # ALWAYS try to save whatever was built (resilient on odd workbooks).
             if pivot_plan and source_table is not None:
-                self._build_plan(excel, wb, pivot_plan, source_table, data_sheet)
-                self._build_dashboard_charts(wb)
-
-            self._conditional_format_tables(excel, wb, skip={src_name},
-                                            skip_sheets=skip_sheets)
-            self._autofit_all(wb, skip_sheets=skip_sheets)
-            wb.Save()
+                try:
+                    self._build_plan(excel, wb, pivot_plan, source_table, data_sheet)
+                except Exception as exc:                   # noqa: BLE001
+                    self.notes.append(f"Some pivot tables could not be built: {exc}")
+                try:
+                    self._build_dashboard_charts(wb)
+                except Exception as exc:                   # noqa: BLE001
+                    self.notes.append(f"Dashboard charts skipped: {exc}")
+            try:
+                self._conditional_format_tables(excel, wb, skip={src_name},
+                                                skip_sheets=skip_sheets)
+            except Exception:
+                pass
+            try:
+                self._autofit_all(wb, skip_sheets=skip_sheets)
+            except Exception:
+                pass
+            try:
+                wb.Save()
+                saved = True
+            except Exception as exc:                       # noqa: BLE001
+                self.notes.append(f"Could not save Excel changes: {exc}")
         finally:
             if wb is not None:
                 wb.Close(SaveChanges=False)
             excel.Quit()
             pythoncom.CoUninitialize()
+        if not saved:
+            # Nothing persisted -> let the caller fall back to static tables.
+            raise RuntimeError("Excel step did not save any changes.")
 
     # -- source -> Table (req 5 detection) ------------------------------------
     def _ensure_source_table(self, wb, profile: WorkbookProfile):
@@ -141,10 +169,16 @@ class ExcelFinalizer:
                 cursor = used.Row + used.Rows.Count + 2
 
             for spec in specs:
-                pt, cursor = self._build_one_pivot(excel, wb, ws, spec,
-                                                   source_table, cursor)
-                if pt is not None:
-                    built.append((pt, spec))
+                try:
+                    pt, cursor = self._build_one_pivot(excel, wb, ws, spec,
+                                                       source_table, cursor)
+                    if pt is not None:
+                        built.append((pt, spec))
+                        self.pivots_built += 1
+                except Exception as exc:                   # noqa: BLE001
+                    # Skip just this pivot; keep building the others.
+                    self.notes.append(f"Skipped pivot '{spec.title}': {exc}")
+                    cursor += 18
 
         # SECOND PASS: apply sorting + conditional formatting only after every
         # pivot exists. Date grouping refreshes the shared cache and would wipe
@@ -153,13 +187,22 @@ class ExcelFinalizer:
         # so do ALL of those first, then sort, then conditional-format -- this
         # way nothing later wipes an earlier pivot's sort/CF.
         for pt, _spec in built:
-            self._disable_subtotals(pt)
+            try:
+                self._disable_subtotals(pt)
+            except Exception:
+                continue
         for pt, spec in built:
-            last = spec.row_fields[-1] if spec.row_fields else None
-            if last and last != spec.group_date_field:
-                self._sort_and_limit(pt, last, spec.visible_items)
+            try:
+                last = spec.row_fields[-1] if spec.row_fields else None
+                if last and last != spec.group_date_field:
+                    self._sort_and_limit(pt, last, spec.visible_items)
+            except Exception:
+                continue
         for pt, _spec in built:
-            self._cf_pivot(pt)
+            try:
+                self._cf_pivot(pt)
+            except Exception:
+                continue
 
     def _disable_subtotals(self, pt) -> None:
         """Turn off subtotals so each data field's DataRange is pure detail
@@ -207,8 +250,18 @@ class ExcelFinalizer:
             pt.PivotFields(rf).Orientation = XL_ROW_FIELD
 
         for df in spec.data_fields:
-            fld = pt.AddDataField(pt.PivotFields(df.source_field),
-                                  df.caption, df.func)
+            # A USD-converted measure is a pivot CalculatedField (= base / rate).
+            # Create it on demand; if it fails, skip just this dollar column.
+            if getattr(df, "calc_formula", None):
+                try:
+                    pt.CalculatedFields().Add(df.source_field, df.calc_formula)
+                except Exception:
+                    continue
+            try:
+                fld = pt.AddDataField(pt.PivotFields(df.source_field),
+                                      df.caption, df.func)
+            except Exception:
+                continue
             if getattr(df, "calculation", None) is not None:
                 try:
                     fld.Calculation = df.calculation     # e.g. % of grand total

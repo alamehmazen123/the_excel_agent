@@ -316,6 +316,21 @@ class MainWindow(QWidget):
         self._start_run(options)
 
     def _start_run(self, options: AnalysisOptions) -> None:
+        # Hospital reports are in LBP. Offer to add a parallel USD column.
+        box = QMessageBox(self)
+        box.setWindowTitle(config.APP_NAME)
+        box.setIcon(QMessageBox.Question)
+        box.setText("DO YOU WANT TO CALCULATE THE VALUES IN DOLLAR ALSO?")
+        box.setInformativeText(
+            "Values are treated as Lebanese Pounds (LBP) unless a column's header "
+            "says “$”, “USD” or “Dollar”.\n\n"
+            "Choose Yes to keep LBP and add a parallel USD column "
+            f"(exchange rate: {90000:,} LBP = 1 $).")
+        yes_btn = box.addButton("Yes — add $ column", QMessageBox.YesRole)
+        box.addButton("No — LBP only", QMessageBox.NoRole)
+        box.exec()
+        options.add_dollar = box.clickedButton() is yes_btn
+
         self._set_busy(True)
         self.status_label.setText("Starting…")
         self._thread, self._worker = start_analysis(

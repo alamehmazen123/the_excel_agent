@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import config
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                QFrame, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMessageBox, QPushButton,
                                QScrollArea, QVBoxLayout, QWidget)
@@ -73,15 +73,17 @@ class CustomWizardDialog(QDialog):
 
         # --- Combination pivots section (optional, in addition to singles) ---
         root.addWidget(self._section(
-            "3.  Combination pivots (optional) — nest titles into one table"))
+            "3.  Combination pivots (optional) — tick titles to nest into one table"))
         combo_row = QHBoxLayout()
-        self.combo_src = QListWidget()
-        self.combo_src.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.combo_src.setMaximumHeight(96)
-        combo_row.addWidget(self.combo_src, 1)
+        # A checkbox list of EVERY title and date header; a blue tick marks each
+        # one the user wants to nest into a single combined pivot.
+        self._combo_host = self._scroll_area()
+        self._combo_host["scroll"].setMaximumHeight(140)
+        self._combo_checks: list[tuple[QCheckBox, str]] = []
+        combo_row.addWidget(self._combo_host["scroll"], 1)
         btns = QVBoxLayout()
         add_btn = QPushButton("Add ▸")
-        add_btn.setToolTip("Pick 2–3 titles on the left, then Add a combination")
+        add_btn.setToolTip("Tick 2–3 titles on the left, then Add a combination")
         add_btn.clicked.connect(self._add_combination)
         rm_btn = QPushButton("Remove")
         rm_btn.clicked.connect(self._remove_combination)
@@ -90,7 +92,7 @@ class CustomWizardDialog(QDialog):
         btns.addStretch(1)
         combo_row.addLayout(btns)
         self.combo_added = QListWidget()
-        self.combo_added.setMaximumHeight(96)
+        self.combo_added.setMaximumHeight(140)
         combo_row.addWidget(self.combo_added, 1)
         root.addLayout(combo_row)
         self._populate_combos()
@@ -174,21 +176,35 @@ class CustomWizardDialog(QDialog):
             self._measure_rows.append((cb, m["name"], combo))
 
     def _populate_combos(self) -> None:
-        self.combo_src.clear()
+        self._combo_checks.clear()
         self.combo_added.clear()
+        # Rebuild the checkbox list (clears any previous rows).
+        layout = self._combo_host["layout"]
+        while layout.count() > 1:                  # keep the trailing stretch
+            it = layout.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.deleteLater()
+        # Full list of major titles AND date headers, each as a blue-tick checkbox.
         for d in self._desc["dimensions"]:
-            self.combo_src.addItem(d["name"])
+            cb = QCheckBox(d["name"])
+            cb.setObjectName("ComboCheck")
+            if d.get("kind") == "date":
+                cb.setText(f"{d['name']}  (date)")
+            layout.insertWidget(layout.count() - 1, cb)
+            self._combo_checks.append((cb, d["name"]))
 
     def _add_combination(self) -> None:
-        names = [i.text() for i in self.combo_src.selectedItems()]
+        names = [name for cb, name in self._combo_checks if cb.isChecked()]
         if len(names) < 2:
             QMessageBox.information(self, config.APP_NAME,
-                                    "Pick at least 2 titles (Ctrl-click) to combine.")
+                                    "Tick at least 2 titles to combine into one pivot.")
             return
         item = QListWidgetItem(" + ".join(names))
         item.setData(Qt.UserRole, names)
         self.combo_added.addItem(item)
-        self.combo_src.clearSelection()
+        for cb, _name in self._combo_checks:       # reset for the next combination
+            cb.setChecked(False)
 
     def _remove_combination(self) -> None:
         for it in self.combo_added.selectedItems():

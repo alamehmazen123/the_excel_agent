@@ -36,7 +36,11 @@ PERCENT_OF_TOTAL_FORMAT = "0.00%"
 # PNL PCT etc. are already in percent units (0.11 == 0.11%), so append a literal
 # % rather than Excel's "%" format (which would multiply by 100).
 PCT_FORMAT = '0.00"%"'
-DEFAULT_CURRENCY = '"$"#,##0.00'
+# Hospital reports are in Lebanese Pounds by default. Use $ only when the header
+# or the source cell format explicitly indicates dollars.
+LBP_FORMAT = '#,##0" LBP"'
+USD_FORMAT = '"$"#,##0.00'
+USD_PER_LBP = 90000          # exchange rate: 90,000 LBP = 1 USD
 
 TOP_N = 20                 # cap for wide dimensions (e.g. TRIGGER DETAIL)
 MAX_DIMS = 8               # don't generate an unbounded number of pivots
@@ -51,6 +55,25 @@ class DataFieldSpec:
     number_format: str
     # Optional "show values as" calculation, e.g. XL_PERCENT_OF_TOTAL.
     calculation: Optional[int] = None
+    # Optional pivot CalculatedField formula (e.g. "='Revenue'/90000" for USD).
+    # When set, source_field is the NEW calculated field's name.
+    calc_formula: Optional[str] = None
+
+
+def _usd_pair(col_name: str) -> DataFieldSpec:
+    """A USD data field (= column / 90000) implemented as a pivot calculated field."""
+    return DataFieldSpec(f"{col_name} (USD)", XL_SUM, f"Total {col_name} ($)",
+                         USD_FORMAT, calc_formula=f"='{col_name}'/{USD_PER_LBP}")
+
+
+def value_fields(col: ColumnProfile, fmt: str, cap: str,
+                 add_dollar: bool) -> list[DataFieldSpec]:
+    """The native value field, plus a USD-converted field when requested and the
+    column isn't already in dollars."""
+    fields = [DataFieldSpec(col.name, XL_SUM, cap, fmt)]
+    if add_dollar and not _is_dollar(col):
+        fields.append(_usd_pair(col.name))
+    return fields
 
 
 @dataclass
@@ -67,13 +90,23 @@ class PivotSpec:
     visible_items: Optional[list[str]] = None
 
 
-def _currency_format(col: Optional[ColumnProfile]) -> str:
+def _is_dollar(col: Optional[ColumnProfile]) -> bool:
+    """True only if the column is explicitly in dollars (header or cell format)."""
     if col is None:
-        return DEFAULT_CURRENCY
-    f = col.number_format or "General"
-    if any(sym in f for sym in ("$", "€", "£", "¥", "₹", "[$", "USD")):
-        return f
-    return DEFAULT_CURRENCY
+        return False
+    f = (col.number_format or "")
+    if "$" in f or "USD" in f:
+        return True
+    n = col.name.lower()
+    return ("$" in n or "usd" in n or "dollar" in n or "usdt" in n)
+
+
+def _currency_format(col: Optional[ColumnProfile]) -> str:
+    """Dollar format if the column is explicitly $, otherwise Lebanese Pounds."""
+    if _is_dollar(col):
+        f = col.number_format or ""
+        return f if ("$" in f) else USD_FORMAT
+    return LBP_FORMAT
 
 
 def _percent_format(col: ColumnProfile) -> str:
@@ -113,13 +146,18 @@ def _ranked_labels(table: TableProfile, dim: ColumnProfile,
 
 def _combined_spec(table: TableProfile, date_name: Optional[str],
                    dim_cols: list[ColumnProfile],
-                   value_fields: list[tuple], pct_col: ColumnProfile,
-                   pct_caption: str) -> Optional[PivotSpec]:
-    """One pivot nesting a date period + 2-3 titles, with Sum value(s) + % of total."""
+                   value_specs: list[tuple], pct_col: ColumnProfile,
+                   pct_caption: str, add_dollar: bool) -> Optional[PivotSpec]:
+    """One pivot nesting a date period + 2-3 titles, with Sum value(s) + % of total.
+
+    ``value_specs`` is a list of (ColumnProfile, format, caption) tuples.
+    """
     rows = ([date_name] if date_name else []) + [d.name for d in dim_cols]
     if len(rows) < 2:                 # 'combined' needs at least two titles
         return None
-    data = [DataFieldSpec(col.name, XL_SUM, cap, fmt) for (col, fmt, cap) in value_fields]
+    data: list[DataFieldSpec] = []
+    for (col, fmt, cap) in value_specs:
+        data.extend(value_fields(col, fmt, cap, add_dollar))
     data.append(DataFieldSpec(pct_col.name, XL_SUM, f"{pct_col.name} (% of total)",
                               PERCENT_OF_TOTAL_FORMAT, calculation=XL_PERCENT_OF_TOTAL))
     last_dim = dim_cols[-1] if dim_cols else None
@@ -129,7 +167,8 @@ def _combined_spec(table: TableProfile, date_name: Optional[str],
                      rows, data, group_date_field=date_name, ordered_labels=ordered)
 
 
-def build_custom_plan(table: TableProfile, sel: CustomSelection) -> list[PivotSpec]:
+def build_custom_plan(table: TableProfile, sel: CustomSelection,
+                      add_dollar: bool = False) -> list[PivotSpec]:
     """Build pivots from the user's explicit dimension/measure picks."""
     # Resolve each chosen measure to (column, format, role, caption).
     resolved = []
@@ -159,19 +198,24 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection) -> list[PivotSp
         dfs = []
         if count_field:
             dfs.append(DataFieldSpec(count_field, XL_COUNT, "Record Count", INT_FORMAT))
-        for (col, fmt, _role, cap) in resolved:
-            dfs.append(DataFieldSpec(col.name, XL_SUM, cap, fmt))
+        for (col, fmt, role, cap) in resolved:
+            if role == "value":
+                dfs.extend(value_fields(col, fmt, cap, add_dollar))
+            else:
+                dfs.append(DataFieldSpec(col.name, XL_SUM, cap, fmt))
         plan.append(PivotSpec(SHEET_PIVOT, f"By {d.name} (Month/Year)",
                               [d.name], dfs, group_date_field=d.name))
 
     # Each categorical dimension x each chosen measure.
     for d in cat_dims:
         wide = TableProfile.is_wide_dimension(d)
-        for (col, fmt, _role, cap) in resolved:
+        for (col, fmt, role, cap) in resolved:
             ordered = _ranked_labels(table, d, col)
+            data = (value_fields(col, fmt, cap, add_dollar) if role == "value"
+                    else [DataFieldSpec(col.name, XL_SUM, cap, fmt)])
             plan.append(PivotSpec(
                 SHEET_PIVOT, f"{col.name} by {d.name}", [d.name],
-                [DataFieldSpec(col.name, XL_SUM, cap, fmt)],
+                data,
                 ordered_labels=ordered,
                 visible_items=ordered[:TOP_N] if wide else None))
 
@@ -186,7 +230,7 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection) -> list[PivotSp
                 SHEET_PIVOT,
                 f"{vcol.name} by {date_dims[0].name} (Month/Year) & {d.name}",
                 [pd_name, d.name],
-                [DataFieldSpec(vcol.name, XL_SUM, vcap, vfmt)],
+                value_fields(vcol, vfmt, vcap, add_dollar),
                 group_date_field=pd_name,
                 ordered_labels=ordered,
                 visible_items=ordered[:TOP_N] if wide else None))
@@ -201,7 +245,7 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection) -> list[PivotSp
             cdate = next((c.name for c in cols if c.ctype == ColumnType.DATE), None)
             ccats = [c for c in cols if c.ctype != ColumnType.DATE]
             combined = _combined_spec(table, cdate, ccats[:3], value_measures,
-                                      vcol, vcap)
+                                      vcol, vcap, add_dollar)
             if combined is not None:
                 plan.append(combined)
 
@@ -219,13 +263,14 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection) -> list[PivotSp
 
 
 def build_pivot_plan(profile: WorkbookProfile,
-                     custom: Optional[CustomSelection] = None) -> list[PivotSpec]:
+                     custom: Optional[CustomSelection] = None,
+                     add_dollar: bool = False) -> list[PivotSpec]:
     table = profile.primary
     if table is None:
         return []
 
     if custom is not None and custom.is_valid():
-        return build_custom_plan(table, custom)
+        return build_custom_plan(table, custom, add_dollar)
 
     value = table.primary_value_measure
     pct = table.percent_measures[0] if table.percent_measures else None
@@ -248,7 +293,7 @@ def build_pivot_plan(profile: WorkbookProfile,
         if count_field:
             dfs.append(DataFieldSpec(count_field, XL_COUNT, "Record Count", INT_FORMAT))
         if value is not None:
-            dfs.append(DataFieldSpec(value.name, XL_SUM, value_caption, vfmt))
+            dfs.extend(value_fields(value, vfmt, value_caption, add_dollar))
         if dfs:
             plan.append(PivotSpec(SHEET_PIVOT, f"By {d.name} (Month/Year)",
                                   [d.name], dfs, group_date_field=d.name))
@@ -260,7 +305,7 @@ def build_pivot_plan(profile: WorkbookProfile,
             ordered = _ranked_labels(table, dim, value)
             plan.append(PivotSpec(
                 SHEET_PIVOT, f"{value.name} by {dim.name}", [dim.name],
-                [DataFieldSpec(value.name, XL_SUM, value_caption, vfmt)],
+                value_fields(value, vfmt, value_caption, add_dollar),
                 ordered_labels=ordered,
                 visible_items=ordered[:TOP_N] if wide else None))
         if pct is not None:
@@ -297,7 +342,7 @@ def build_pivot_plan(profile: WorkbookProfile,
         for a, b in list(itertools.combinations(narrow, 2))[:3]:
             combined = _combined_spec(table, date_name, [a, b],
                                       [(value, vfmt, value_caption)], value,
-                                      value_caption)
+                                      value_caption, add_dollar)
             if combined is not None:
                 plan.append(combined)
 

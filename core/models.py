@@ -227,11 +227,17 @@ class AnalysisOptions:
     pivot: bool = True
     kpi: bool = True
     executive_summary: bool = True
+    # Library-decoded plain summary tables (appears only when the library has
+    # knowledge this workbook uses; see core/library + analyzers/smart_tables).
+    smart_tables: bool = True
     # When set, the Custom Generate wizard drives the pivots/measures.
     custom: Optional["CustomSelection"] = None
+    # If True, add a USD column (= LBP / 90000) next to each LBP value column.
+    add_dollar: bool = False
 
     def any_selected(self) -> bool:
-        return any((self.dashboard, self.pivot, self.kpi, self.executive_summary))
+        return any((self.dashboard, self.pivot, self.kpi,
+                    self.executive_summary, self.smart_tables))
 
 
 @dataclass
