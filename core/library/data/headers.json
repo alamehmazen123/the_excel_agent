@@ -1,0 +1,920 @@
+{
+  "entries": {
+    "% ADM.": {
+      "category": "",
+      "meaning": "Percentage of Patients admitted from ER to in-patient (hospital)",
+      "notes": ""
+    },
+    "ACC NAME": {
+      "category": "",
+      "meaning": "Hospital Account Name",
+      "notes": ""
+    },
+    "ACC NO": {
+      "category": "",
+      "meaning": "Hospital Account Number",
+      "notes": ""
+    },
+    "ACCT": {
+      "category": "",
+      "meaning": "Acccount Number of Patient",
+      "notes": ""
+    },
+    "ACCT_NAME": {
+      "category": "",
+      "meaning": "Department Account Number",
+      "notes": ""
+    },
+    "ACTT": {
+      "category": "",
+      "meaning": "Account Number",
+      "notes": ""
+    },
+    "ACTTNUMB": {
+      "category": "",
+      "meaning": "Department Account Name",
+      "notes": ""
+    },
+    "ADM": {
+      "category": "",
+      "meaning": "Admission Date",
+      "notes": ""
+    },
+    "ADMISSION": {
+      "category": "",
+      "meaning": "Admission",
+      "notes": ""
+    },
+    "ADM_TIME": {
+      "category": "",
+      "meaning": "Admission Date and time",
+      "notes": ""
+    },
+    "AMA": {
+      "category": "",
+      "meaning": "Patient Left Against Medical Advice",
+      "notes": ""
+    },
+    "AMOUNT": {
+      "category": "",
+      "meaning": "Amount in LBP",
+      "notes": ""
+    },
+    "AMOUNT_LBP": {
+      "category": "",
+      "meaning": "Amount in LBP",
+      "notes": ""
+    },
+    "ARMY": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : ARMY",
+      "notes": ""
+    },
+    "BALANCE": {
+      "category": "",
+      "meaning": "TOTAL Balance of the invoice / patient",
+      "notes": ""
+    },
+    "BED": {
+      "category": "",
+      "meaning": "Bed Number",
+      "notes": ""
+    },
+    "BILL_DATE": {
+      "category": "",
+      "meaning": "Final Bill Date",
+      "notes": ""
+    },
+    "CAR ACCIDENT/ TRAUMA / GUN SHOT": {
+      "category": "",
+      "meaning": "Type of ER admissions",
+      "notes": ""
+    },
+    "CARDIAC CATH": {
+      "category": "",
+      "meaning": "Cardiac Cathetarization CATH_LAB number of patients",
+      "notes": ""
+    },
+    "CHITNL": {
+      "category": "",
+      "meaning": "Radiology Act Name",
+      "notes": ""
+    },
+    "CLASS": {
+      "category": "",
+      "meaning": "UOM",
+      "notes": ""
+    },
+    "CLASS NAME": {
+      "category": "",
+      "meaning": "Category of item/department",
+      "notes": ""
+    },
+    "COMP_PART": {
+      "category": "",
+      "meaning": "Guarantor Part of invoice of the invoice / patient",
+      "notes": ""
+    },
+    "COST ACCOUNT": {
+      "category": "",
+      "meaning": "COST Account",
+      "notes": ""
+    },
+    "COST CENTER": {
+      "category": "",
+      "meaning": "Cost Center",
+      "notes": ""
+    },
+    "CRATE": {
+      "category": "",
+      "meaning": "Create code",
+      "notes": ""
+    },
+    "CSDRN": {
+      "category": "",
+      "meaning": "Code of FINANCIAL CATEGORY",
+      "notes": ""
+    },
+    "CT SCAN": {
+      "category": "",
+      "meaning": "CT Scan",
+      "notes": ""
+    },
+    "CUMM. ADM": {
+      "category": "",
+      "meaning": "cummulative admission numbers",
+      "notes": ""
+    },
+    "CURR": {
+      "category": "",
+      "meaning": "Currency (LL= LBP / USD = $)",
+      "notes": ""
+    },
+    "CUSTOMER": {
+      "category": "",
+      "meaning": "Guarantor",
+      "notes": ""
+    },
+    "DATE": {
+      "category": "",
+      "meaning": "DATE",
+      "notes": ""
+    },
+    "DAY": {
+      "category": "",
+      "meaning": "day of the week",
+      "notes": ""
+    },
+    "DEP.NAME": {
+      "category": "",
+      "meaning": "Department Name",
+      "notes": ""
+    },
+    "DEPARTMENT": {
+      "category": "",
+      "meaning": "Depratment Code",
+      "notes": ""
+    },
+    "DEPT": {
+      "category": "",
+      "meaning": "Department",
+      "notes": ""
+    },
+    "DESCRIPTION": {
+      "category": "",
+      "meaning": "Description",
+      "notes": ""
+    },
+    "DETAIL": {
+      "category": "",
+      "meaning": "Details",
+      "notes": ""
+    },
+    "DISCHARGE": {
+      "category": "",
+      "meaning": "Discharge",
+      "notes": ""
+    },
+    "DISH": {
+      "category": "",
+      "meaning": "Discharge Date and time",
+      "notes": ""
+    },
+    "DISH_TIME": {
+      "category": "",
+      "meaning": "Discharge Date and time",
+      "notes": ""
+    },
+    "DMDRNL": {
+      "category": "",
+      "meaning": "Referring Doctor's Name",
+      "notes": ""
+    },
+    "DOC": {
+      "category": "",
+      "meaning": "Document Number",
+      "notes": ""
+    },
+    "DOC#": {
+      "category": "",
+      "meaning": "Document Number",
+      "notes": ""
+    },
+    "DOC_DATE": {
+      "category": "",
+      "meaning": "Document date",
+      "notes": ""
+    },
+    "DR": {
+      "category": "",
+      "meaning": "Doctor CODE number",
+      "notes": ""
+    },
+    "DR.F.O.C": {
+      "category": "",
+      "meaning": "Doctor Free Of Charge",
+      "notes": ""
+    },
+    "DRN": {
+      "category": "",
+      "meaning": "Doctor's Code",
+      "notes": ""
+    },
+    "DRUG CODE": {
+      "category": "",
+      "meaning": "Drug Code",
+      "notes": ""
+    },
+    "DRUG NAME": {
+      "category": "",
+      "meaning": "Drug Name",
+      "notes": ""
+    },
+    "DR_NAME": {
+      "category": "",
+      "meaning": "Doctor Name",
+      "notes": ""
+    },
+    "E-F.O.C": {
+      "category": "",
+      "meaning": "Employee Free Of Charge",
+      "notes": ""
+    },
+    "E.F-F.O.C": {
+      "category": "",
+      "meaning": "Employee's Family Free Of Charge",
+      "notes": ""
+    },
+    "ECHO": {
+      "category": "",
+      "meaning": "ECHO",
+      "notes": ""
+    },
+    "EMP. COOP": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : COOP",
+      "notes": ""
+    },
+    "ENDOSCOPY": {
+      "category": "",
+      "meaning": "Endoscopy number of patients",
+      "notes": ""
+    },
+    "ER": {
+      "category": "",
+      "meaning": "ER numbers",
+      "notes": ""
+    },
+    "EXCH_RATE": {
+      "category": "",
+      "meaning": "Exchange Rate",
+      "notes": ""
+    },
+    "FBILL": {
+      "category": "",
+      "meaning": "Final Bill status",
+      "notes": ""
+    },
+    "FB_PERIOD": {
+      "category": "",
+      "meaning": "Final Bill Period",
+      "notes": ""
+    },
+    "FCAT": {
+      "category": "",
+      "meaning": "Financial Category",
+      "notes": ""
+    },
+    "FCCD": {
+      "category": "",
+      "meaning": "Financial Category CODE",
+      "notes": ""
+    },
+    "FINACIAL_CATEGORY": {
+      "category": "",
+      "meaning": "Financial Category NAME",
+      "notes": ""
+    },
+    "FINACIAL_CAT_NAME": {
+      "category": "",
+      "meaning": "Financial Category Name",
+      "notes": ""
+    },
+    "FINAINCIAL": {
+      "category": "",
+      "meaning": "Financial Category of the patient",
+      "notes": ""
+    },
+    "FINANCIAL_CAT": {
+      "category": "",
+      "meaning": "Financial Category",
+      "notes": ""
+    },
+    "FLD1": {
+      "category": "",
+      "meaning": "Code of items (department/supplier/guarantor/staff/transaction",
+      "notes": ""
+    },
+    "FNCATEGORY": {
+      "category": "",
+      "meaning": "Financial Category Code",
+      "notes": ""
+    },
+    "FNI#": {
+      "category": "",
+      "meaning": "Financial Code",
+      "notes": ""
+    },
+    "GUARANTOR": {
+      "category": "",
+      "meaning": "Guarantor Name",
+      "notes": ""
+    },
+    "HAFZA_PER": {
+      "category": "",
+      "meaning": "Hafza Period",
+      "notes": ""
+    },
+    "HFZ_DATE": {
+      "category": "",
+      "meaning": "Hafza Date",
+      "notes": ""
+    },
+    "HFZ_NO": {
+      "category": "",
+      "meaning": "HAFZA number",
+      "notes": ""
+    },
+    "HOSP_PART": {
+      "category": "",
+      "meaning": "Hospital Payment Part",
+      "notes": ""
+    },
+    "INS": {
+      "category": "",
+      "meaning": "Guarantor Name",
+      "notes": ""
+    },
+    "INSCMP_NAME": {
+      "category": "",
+      "meaning": "Guarantor's Name",
+      "notes": ""
+    },
+    "INSURANCE": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : INSURANCE",
+      "notes": ""
+    },
+    "INVDATE": {
+      "category": "",
+      "meaning": "invoice Date",
+      "notes": ""
+    },
+    "INVDISCOUNT": {
+      "category": "",
+      "meaning": "Discount on invoice",
+      "notes": ""
+    },
+    "INVNET": {
+      "category": "",
+      "meaning": "TOTAL VALUE OF INVOICE after discount",
+      "notes": ""
+    },
+    "INVNO": {
+      "category": "",
+      "meaning": "Invoice Number",
+      "notes": ""
+    },
+    "INVVALUE": {
+      "category": "",
+      "meaning": "Invoice Value in LBP",
+      "notes": ""
+    },
+    "IOPAT": {
+      "category": "",
+      "meaning": "in-patient/out-patient",
+      "notes": ""
+    },
+    "ISF": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : I.S.F",
+      "notes": ""
+    },
+    "ISLAMIC HEALTH": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : I.H.",
+      "notes": ""
+    },
+    "ITEM": {
+      "category": "",
+      "meaning": "Row #",
+      "notes": ""
+    },
+    "ITEM_DESCP": {
+      "category": "",
+      "meaning": "item description",
+      "notes": ""
+    },
+    "ITM_CODE": {
+      "category": "",
+      "meaning": "item code",
+      "notes": ""
+    },
+    "JE_DOC": {
+      "category": "",
+      "meaning": "Journal document",
+      "notes": ""
+    },
+    "JE_DOCDT": {
+      "category": "",
+      "meaning": "Journal document Date",
+      "notes": ""
+    },
+    "LEFT WITHOUT ADMISSION": {
+      "category": "",
+      "meaning": "Patient Left without admission (although he needs admission)",
+      "notes": ""
+    },
+    "MAMO": {
+      "category": "",
+      "meaning": "MAMO",
+      "notes": ""
+    },
+    "MED": {
+      "category": "",
+      "meaning": "Medical Number of patient",
+      "notes": ""
+    },
+    "MEDICAL": {
+      "category": "",
+      "meaning": "Medica Number",
+      "notes": ""
+    },
+    "MED_ACCNO": {
+      "category": "",
+      "meaning": "Medical Account Number or Transaction ACCOUNT Number",
+      "notes": ""
+    },
+    "MED_TRNO": {
+      "category": "",
+      "meaning": "Medical Number or Transaction Number",
+      "notes": ""
+    },
+    "MISC": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : MISC.",
+      "notes": ""
+    },
+    "MOBILE": {
+      "category": "",
+      "meaning": "Patient Cellular phone Number",
+      "notes": ""
+    },
+    "MOH": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : MOPH",
+      "notes": ""
+    },
+    "MONTH": {
+      "category": "",
+      "meaning": "Month",
+      "notes": ""
+    },
+    "MRI": {
+      "category": "",
+      "meaning": "MRI",
+      "notes": ""
+    },
+    "NATONALITY": {
+      "category": "",
+      "meaning": "NATONALITY",
+      "notes": ""
+    },
+    "NRSST_NAME": {
+      "category": "",
+      "meaning": "Nursing Department Name",
+      "notes": ""
+    },
+    "NRST": {
+      "category": "",
+      "meaning": "Nurse Station Code",
+      "notes": ""
+    },
+    "NSSF": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : NSSF",
+      "notes": ""
+    },
+    "NUCLEAR": {
+      "category": "",
+      "meaning": "NUCLEAR",
+      "notes": ""
+    },
+    "NUMBER OF PATIENTS": {
+      "category": "",
+      "meaning": "Total number of Patients",
+      "notes": ""
+    },
+    "OCCUPANCY": {
+      "category": "",
+      "meaning": "Occupancy",
+      "notes": ""
+    },
+    "OR": {
+      "category": "",
+      "meaning": "Operating room (OR) number of surgeries",
+      "notes": ""
+    },
+    "ORG_AMOUNT": {
+      "category": "",
+      "meaning": "Original Amount",
+      "notes": ""
+    },
+    "OTCTNL": {
+      "category": "",
+      "meaning": "Radiology Act Category",
+      "notes": ""
+    },
+    "PAADDT": {
+      "category": "",
+      "meaning": "Patient Admission date",
+      "notes": ""
+    },
+    "PADHDT": {
+      "category": "",
+      "meaning": "Patient Discharge date",
+      "notes": ""
+    },
+    "PAIDAMT": {
+      "category": "",
+      "meaning": "TOTAL PAID AMOUNT (TOTAL REVENUE)",
+      "notes": ""
+    },
+    "PANORAMIC": {
+      "category": "",
+      "meaning": "PANORAMIC",
+      "notes": ""
+    },
+    "PATIENT STAYED IN ER": {
+      "category": "",
+      "meaning": "Number of Patients stayed in ER department",
+      "notes": ""
+    },
+    "PATIENT'S TRANSFERRED BY AMBULANCE": {
+      "category": "",
+      "meaning": "Patient's transferred by Ambulance",
+      "notes": ""
+    },
+    "PATIENTS ADMITTED TO HOSIPTAL FROM ER": {
+      "category": "",
+      "meaning": "Number of Patients admitted from ER to in-patient (hospital)",
+      "notes": ""
+    },
+    "PATIENT_NAME": {
+      "category": "",
+      "meaning": "Patient Name",
+      "notes": ""
+    },
+    "PATTCH": {
+      "category": "",
+      "meaning": "Cach Part of invoice of the invoice / patient",
+      "notes": ""
+    },
+    "PATTPY": {
+      "category": "",
+      "meaning": "Guarantor Part of invoice of the invoice / patient",
+      "notes": ""
+    },
+    "PAT_ADDRESS": {
+      "category": "",
+      "meaning": "Patient home Address",
+      "notes": ""
+    },
+    "PAT_NAME": {
+      "category": "",
+      "meaning": "Patient Name",
+      "notes": ""
+    },
+    "PAT_PART": {
+      "category": "",
+      "meaning": "Cach Part of invoice of the invoice / patient",
+      "notes": ""
+    },
+    "PAT_TEL": {
+      "category": "",
+      "meaning": "Patient HOME phone Number",
+      "notes": ""
+    },
+    "PAU": {
+      "category": "",
+      "meaning": "PRE-Operating unit number of patients",
+      "notes": ""
+    },
+    "PBMEDN": {
+      "category": "",
+      "meaning": "medical Number",
+      "notes": ""
+    },
+    "PBPTNL": {
+      "category": "",
+      "meaning": "Patient Name",
+      "notes": ""
+    },
+    "PCR": {
+      "category": "",
+      "meaning": "number of PCR tests",
+      "notes": ""
+    },
+    "PET-SCAN": {
+      "category": "",
+      "meaning": "PET-SCAN",
+      "notes": ""
+    },
+    "PNAME": {
+      "category": "",
+      "meaning": "Patient Name",
+      "notes": ""
+    },
+    "PO#": {
+      "category": "",
+      "meaning": "Purchasing Order number",
+      "notes": ""
+    },
+    "PORTABLE X-RAY": {
+      "category": "",
+      "meaning": "PORTABLE X-RAY",
+      "notes": ""
+    },
+    "PREV. YR OCCUPANCY": {
+      "category": "",
+      "meaning": "previous year occupancy numbers",
+      "notes": ""
+    },
+    "PRFT_CNT_NAME": {
+      "category": "",
+      "meaning": "Profit Center Name",
+      "notes": ""
+    },
+    "PROFIT_C": {
+      "category": "",
+      "meaning": "Profit Center code",
+      "notes": ""
+    },
+    "PSMA-GALLI": {
+      "category": "",
+      "meaning": "PSMA-GALLI",
+      "notes": ""
+    },
+    "PURCHASING ACCOUNT": {
+      "category": "",
+      "meaning": "Purchasing Account",
+      "notes": ""
+    },
+    "QTY": {
+      "category": "",
+      "meaning": "Quantity",
+      "notes": ""
+    },
+    "RECEIPT": {
+      "category": "",
+      "meaning": "Receipt Number",
+      "notes": ""
+    },
+    "REC_TOT_LL": {
+      "category": "",
+      "meaning": "TOTAL SELLING PRICE in LBP",
+      "notes": ""
+    },
+    "REGULAR OR IN 4B": {
+      "category": "",
+      "meaning": "Number of regular surgeries female in 4B floor",
+      "notes": ""
+    },
+    "RES_CD": {
+      "category": "",
+      "meaning": "Medical Act Code",
+      "notes": ""
+    },
+    "REVENUE ACCOUNT": {
+      "category": "",
+      "meaning": "Revenue Account",
+      "notes": ""
+    },
+    "ROOM": {
+      "category": "",
+      "meaning": "Nursing department Room Code",
+      "notes": ""
+    },
+    "SAHEL FREE": {
+      "category": "",
+      "meaning": "Sahel Free Patients",
+      "notes": ""
+    },
+    "SELF": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : PRIVATE PATIENTS",
+      "notes": ""
+    },
+    "SRCC": {
+      "category": "",
+      "meaning": "Source Code",
+      "notes": ""
+    },
+    "STATUS": {
+      "category": "",
+      "meaning": "Admission / Discharge",
+      "notes": ""
+    },
+    "SUB-DEPT": {
+      "category": "",
+      "meaning": "Sub-Department",
+      "notes": ""
+    },
+    "THDATE": {
+      "category": "",
+      "meaning": "Transaction Date",
+      "notes": ""
+    },
+    "THIOP": {
+      "category": "",
+      "meaning": "Patient type (in-patient or out-patient)",
+      "notes": ""
+    },
+    "THPTAM": {
+      "category": "",
+      "meaning": "Radiology Act Value in LBP",
+      "notes": ""
+    },
+    "TOTAL NUCLEAR": {
+      "category": "",
+      "meaning": "TOTAL NUCLEAR",
+      "notes": ""
+    },
+    "TOTAL PATIENTS SEEN IN ER": {
+      "category": "",
+      "meaning": "TOTAL Patients SEEN IN ER",
+      "notes": ""
+    },
+    "TOTAL RADIOLOGY": {
+      "category": "",
+      "meaning": "TOTAL RADIOLOGY",
+      "notes": ""
+    },
+    "TOTAL VALUE": {
+      "category": "",
+      "meaning": "total value of UNIT COST",
+      "notes": ""
+    },
+    "TOT_AMT": {
+      "category": "",
+      "meaning": "TOTAL VALUE OF INVOICE",
+      "notes": ""
+    },
+    "TOT_PRICE": {
+      "category": "",
+      "meaning": "TOTAL COST PRICE in LBP",
+      "notes": ""
+    },
+    "TQTY": {
+      "category": "",
+      "meaning": "transaction Quantity",
+      "notes": ""
+    },
+    "TRANS": {
+      "category": "",
+      "meaning": "Transaction Code",
+      "notes": ""
+    },
+    "TRANS DATE": {
+      "category": "",
+      "meaning": "Transaction Date",
+      "notes": ""
+    },
+    "TUSER": {
+      "category": "",
+      "meaning": "Billing Staff Name",
+      "notes": ""
+    },
+    "TYP": {
+      "category": "",
+      "meaning": "TYPE",
+      "notes": ""
+    },
+    "TYPE": {
+      "category": "",
+      "meaning": "Code of transaction by Supplier/guarantor/account or TYPE OF PATIENT (in-patient/out-patient)",
+      "notes": ""
+    },
+    "T_CATEGORY": {
+      "category": "",
+      "meaning": "Transaction Category",
+      "notes": ""
+    },
+    "T_DATE": {
+      "category": "",
+      "meaning": "Transaction Date",
+      "notes": ""
+    },
+    "T_ORDER": {
+      "category": "",
+      "meaning": "Transaction Order Number",
+      "notes": ""
+    },
+    "T_PRICE": {
+      "category": "",
+      "meaning": "TOTAL unit selling Price in LBP",
+      "notes": ""
+    },
+    "T_TYPE": {
+      "category": "",
+      "meaning": "Admission / Discharge",
+      "notes": ""
+    },
+    "UNHCR": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : UNHCR",
+      "notes": ""
+    },
+    "UNIT COST": {
+      "category": "",
+      "meaning": "unit cost of item",
+      "notes": ""
+    },
+    "UNRWA": {
+      "category": "",
+      "meaning": "Number of patients on Guarantor : UNRWA",
+      "notes": ""
+    },
+    "UOM": {
+      "category": "",
+      "meaning": "UOM",
+      "notes": ""
+    },
+    "USD": {
+      "category": "",
+      "meaning": "amount in USD",
+      "notes": ""
+    },
+    "USD_PAID_AMT": {
+      "category": "",
+      "meaning": "TOTAL SELLING PRICE in USD",
+      "notes": ""
+    },
+    "U_PRICE": {
+      "category": "",
+      "meaning": "UNIT COST PRICE",
+      "notes": ""
+    },
+    "VAR.": {
+      "category": "",
+      "meaning": "variance",
+      "notes": ""
+    },
+    "VENDOR CODE": {
+      "category": "",
+      "meaning": "Supplier / vendor code",
+      "notes": ""
+    },
+    "VENDOR NAME": {
+      "category": "",
+      "meaning": "supplier Name",
+      "notes": ""
+    },
+    "V_TYPE": {
+      "category": "",
+      "meaning": "type of patient (out-patient or in-patient)",
+      "notes": ""
+    },
+    "X-RAY": {
+      "category": "",
+      "meaning": "X-RAY",
+      "notes": ""
+    },
+    "YEAR": {
+      "category": "",
+      "meaning": "year",
+      "notes": ""
+    }
+  },
+  "version": 1
+}

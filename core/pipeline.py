@@ -12,13 +12,14 @@ from .analyzers.dashboard import DashboardAnalyzer
 from .analyzers.executive_summary import ExecutiveSummaryAnalyzer, Narrator
 from .analyzers.kpi import KpiAnalyzer
 from .analyzers.pivot import PivotAnalyzer
+from .analyzers.smart_tables import SmartTablesAnalyzer
 from .constants import SHEET_KPI, SHEET_PIVOT
 from .excel_com import ExcelFinalizer, excel_available
 from .loader import load_workbook_profile
 from .pivot_plan import build_pivot_plan
 from .models import (AnalysisOptions, AnalysisResult, ProgressCallback,
                      TableProfile, WorkbookProfile, _noop_progress)
-from .writer import write_results
+from .writer import append_sheets, write_results
 
 
 class Engine:
@@ -141,27 +142,37 @@ class Engine:
             warnings=list(profile.warnings),
         )
 
+        com_pivots = 0
         if use_com:
             progress(0.86, "Building active pivot tables in Excel…")
             # Build the pivot plan, keeping only pivots whose target sheet exists.
-            plan = build_pivot_plan(profile, custom)
+            plan = build_pivot_plan(profile, custom, options.add_dollar)
             plan = [p for p in plan
                     if (p.target_sheet == SHEET_PIVOT and options.pivot)
                     or (p.target_sheet == SHEET_KPI and options.kpi)]
             finalizer = ExcelFinalizer()
             try:
                 finalizer.finalize(workbook_path, profile, plan)
-                if options.pivot and SHEET_PIVOT not in created:
+                com_pivots = finalizer.pivots_built
+                if options.pivot and com_pivots > 0 and SHEET_PIVOT not in created:
                     created.append(SHEET_PIVOT)
                 result.notes.extend(finalizer.notes)
             except Exception as exc:                       # noqa: BLE001
+                com_pivots = getattr(finalizer, "pivots_built", 0)
                 result.notes.append(
-                    f"Excel finishing step failed ({exc}). The analysis sheets "
-                    "were still produced as static tables.")
-        elif options.pivot:
-            result.notes.append(
-                "Microsoft Excel was not found on this PC, so pivot results are "
-                "static tables. Install Excel for active, refreshable PivotTables.")
+                    f"Active PivotTables could not be built in Excel ({exc}).")
+
+        # Fallback: if Excel is absent OR built no pivots, write a STATIC Pivot
+        # Analysis sheet with openpyxl so the user always gets pivot tables.
+        if options.pivot and SHEET_PIVOT not in created:
+            spec = PivotAnalyzer().run(profile)
+            if spec is not None:
+                created.extend(append_sheets(workbook_path, [spec]))
+                result.notes.append(
+                    "Pivot Analysis was produced as static tables"
+                    + (" (Excel could not build active pivots on this workbook)."
+                       if use_com else
+                       " (install Microsoft Excel for active PivotTables)."))
 
         if summary_analyzer is not None:
             result.summary_used_llm = summary_analyzer.used_llm
@@ -178,6 +189,7 @@ class Engine:
             PivotAnalyzer(),
             KpiAnalyzer(),
             ExecutiveSummaryAnalyzer(self._narrator),
+            SmartTablesAnalyzer(),
         ]
 
     def _selected_analyzers(self, options: AnalysisOptions,
@@ -193,4 +205,6 @@ class Engine:
             chosen.append(DashboardAnalyzer())
         if options.executive_summary:
             chosen.append(ExecutiveSummaryAnalyzer(self._narrator))
+        if options.smart_tables:
+            chosen.append(SmartTablesAnalyzer())
         return chosen

@@ -37,6 +37,12 @@ a = Analysis(
     datas=[
         ('ui/resources/style.qss', 'ui/resources'),
         ('ui/resources/app.ico', 'ui/resources'),
+        ('ui/resources/check.svg', 'ui/resources'),
+        # The reference library (the engine 'brain') -- ship the JSON data so
+        # colleagues get the same decoded Smart Tables / summaries.
+        ('core/library/data/headers.json', 'core/library/data'),
+        ('core/library/data/codes.json', 'core/library/data'),
+        ('core/library/data/meta.json', 'core/library/data'),
     ],
     hiddenimports=hidden,
     hookspath=[],

@@ -1,0 +1,26 @@
+{
+  "sources": [
+    {
+      "category": "",
+      "codes": 0,
+      "file": "HEADER library.xlsx",
+      "headers": 184,
+      "kind": "headers"
+    },
+    {
+      "category": "account",
+      "codes": 2687,
+      "file": "HEADER subtabs account and description library.xlsx",
+      "headers": 0,
+      "kind": "codes"
+    },
+    {
+      "category": "fld1",
+      "codes": 961,
+      "file": "HEADER subtabs for header FLD1 and description library.xlsx",
+      "headers": 0,
+      "kind": "codes"
+    }
+  ],
+  "updated": "2026-06-12T10:51:19.463548+00:00"
+}

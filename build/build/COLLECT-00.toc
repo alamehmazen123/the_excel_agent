@@ -686,6 +686,18 @@
    'C:\\Users\\DR '
    'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\charset_normalizer\\md.cp311-win_amd64.pyd',
    'EXTENSION'),
+  ('core\\library\\data\\codes.json',
+   'C:\\Users\\DR '
+   'MAZEN\\Desktop\\the_excel_agent\\core\\library\\data\\codes.json',
+   'DATA'),
+  ('core\\library\\data\\headers.json',
+   'C:\\Users\\DR '
+   'MAZEN\\Desktop\\the_excel_agent\\core\\library\\data\\headers.json',
+   'DATA'),
+  ('core\\library\\data\\meta.json',
+   'C:\\Users\\DR '
+   'MAZEN\\Desktop\\the_excel_agent\\core\\library\\data\\meta.json',
+   'DATA'),
   ('cryptography-46.0.7.dist-info\\INSTALLER',
    'C:\\Users\\DR '
    'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\cryptography-46.0.7.dist-info\\INSTALLER',
@@ -779,7 +791,7 @@
    'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\keyring-25.7.0.dist-info\\top_level.txt',
    'DATA'),
   ('libcrypto-3-x64.dll',
-   'C:\\Program Files\\Memurai\\libcrypto-3-x64.dll',
+   'C:\\Program Files\\Git\\mingw64\\bin\\libcrypto-3-x64.dll',
    'BINARY'),
   ('libcrypto-3.dll',
    'C:\\Users\\DR '
@@ -790,7 +802,7 @@
    'MAZEN\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\libffi-8.dll',
    'BINARY'),
   ('libssl-3-x64.dll',
-   'C:\\Program Files\\Memurai\\libssl-3-x64.dll',
+   'C:\\Program Files\\Git\\mingw64\\bin\\libssl-3-x64.dll',
    'BINARY'),
   ('libssl-3.dll',
    'C:\\Users\\DR '
@@ -1150,6 +1162,9 @@
    'BINARY'),
   ('ui\\resources\\app.ico',
    'C:\\Users\\DR MAZEN\\Desktop\\the_excel_agent\\ui\\resources\\app.ico',
+   'DATA'),
+  ('ui\\resources\\check.svg',
+   'C:\\Users\\DR MAZEN\\Desktop\\the_excel_agent\\ui\\resources\\check.svg',
    'DATA'),
   ('ui\\resources\\style.qss',
    'C:\\Users\\DR MAZEN\\Desktop\\the_excel_agent\\ui\\resources\\style.qss',

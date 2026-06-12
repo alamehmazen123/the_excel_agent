@@ -11,7 +11,7 @@ import base64
 
 APP_NAME = "Excel Intelligence Agent"
 ORG_NAME = "SAHEL GENERAL HOSPITAL"   # shown in the app window header
-APP_VERSION = "1.9.4"          # <-- bump this for every release (1.0.1, 1.1.0, ...)
+APP_VERSION = "1.10.0"         # <-- bump this for every release (1.0.1, 1.1.0, ...)
 EXE_NAME = "ExcelIntelligenceAgent"
 
 # BUILD_DATE is stamped automatically at build time by tools/stamp_build.py.
