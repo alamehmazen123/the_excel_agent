@@ -28,6 +28,7 @@ XL_SRC_RANGE = 1
 XL_YES = 1
 XL_DATABASE = 1
 XL_ROW_FIELD = 1
+XL_COLUMN_FIELD = 2
 XL_TOP10_TOP = 1
 XL_DATA_FIELD_SCOPE = 2          # XlPivotConditionScope.xlDataFieldScope
 # Group periods order: [Seconds, Minutes, Hours, Days, Months, Quarters, Years]
@@ -70,15 +71,29 @@ class ExcelFinalizer:
         path = os.path.abspath(path)        # Excel COM requires an absolute path
         self.pivots_built = 0
         pythoncom.CoInitialize()
-        excel = win32.Dispatch("Excel.Application")
+        # DispatchEx spins up a SEPARATE, dedicated Excel process. Plain Dispatch
+        # would attach to the user's already-open Excel — then Visible=False hides
+        # their window and any modal dialog they have open (or that we trigger)
+        # blocks us forever, which looks like a frozen progress bar. An isolated
+        # instance can't be disturbed by, or disturb, the user's interactive Excel.
+        excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
+        # Never block on link-update / add-in / macro prompts during automation.
+        try:
+            excel.AskToUpdateLinks = False
+            excel.EnableEvents = False
+            excel.AutomationSecurity = 3        # msoAutomationSecurityForceDisable
+            excel.Application.DisplayAlerts = False
+        except Exception:
+            pass
         wb = None
         saved = False
         try:
             skip_sheets = set(profile.pivot_sheets)
-            wb = excel.Workbooks.Open(path)
+            # UpdateLinks=0 → don't prompt/stall on external-reference workbooks.
+            wb = excel.Workbooks.Open(path, UpdateLinks=0, IgnoreReadOnlyRecommended=True)
             data_sheet = profile.primary.sheet_name if profile.primary else None
 
             source_table = None
@@ -95,10 +110,11 @@ class ExcelFinalizer:
                     self._build_plan(excel, wb, pivot_plan, source_table, data_sheet)
                 except Exception as exc:                   # noqa: BLE001
                     self.notes.append(f"Some pivot tables could not be built: {exc}")
-                try:
-                    self._build_dashboard_charts(wb)
-                except Exception as exc:                   # noqa: BLE001
-                    self.notes.append(f"Dashboard charts skipped: {exc}")
+                # NOTE: the Dashboard charts are built reliably by the openpyxl
+                # DashboardAnalyzer and survive the COM re-save. We deliberately do
+                # NOT rebuild them from pivots here — that path used to DELETE the
+                # openpyxl charts and, if the pivots were empty, left the Dashboard
+                # blank. Keeping the openpyxl charts guarantees a populated sheet.
             try:
                 self._conditional_format_tables(excel, wb, skip={src_name},
                                                 skip_sheets=skip_sheets)
@@ -106,6 +122,14 @@ class ExcelFinalizer:
                 pass
             try:
                 self._autofit_all(wb, skip_sheets=skip_sheets)
+            except Exception:
+                pass
+            try:
+                self._hide_helper_columns(wb, data_sheet)   # keep helpers hidden
+            except Exception:
+                pass
+            try:
+                self._order_sheets(wb)        # canonical tab order before saving
             except Exception:
                 pass
             try:
@@ -147,6 +171,14 @@ class ExcelFinalizer:
         for spec in plan:
             by_sheet[spec.target_sheet].append(spec)
 
+        # ONE shared PivotCache for EVERY pivot. Previously each pivot created its
+        # own cache — on an 80k-row book that meant ~20 full copies of the data,
+        # a ~45 MB file and a very slow run. A single shared cache is fast and
+        # small. (Date grouping is a cache-level op, applied once and inherited.)
+        shared_cache = wb.PivotCaches().Create(SourceType=XL_DATABASE,
+                                               SourceData=source_table.Name)
+        self._date_grouped = False
+
         built: list = []          # (pivot, spec) -> sorted/CF'd in a second pass
         for sheet_name, specs in by_sheet.items():
             if sheet_name == SHEET_PIVOT:
@@ -171,7 +203,7 @@ class ExcelFinalizer:
             for spec in specs:
                 try:
                     pt, cursor = self._build_one_pivot(excel, wb, ws, spec,
-                                                       source_table, cursor)
+                                                       shared_cache, cursor)
                     if pt is not None:
                         built.append((pt, spec))
                         self.pivots_built += 1
@@ -217,7 +249,7 @@ class ExcelFinalizer:
         except Exception:
             pass
 
-    def _build_one_pivot(self, excel, wb, ws, spec: PivotSpec, source_table,
+    def _build_one_pivot(self, excel, wb, ws, spec: PivotSpec, shared_cache,
                          cursor: int):
         # Title above the pivot.
         tcell = ws.Cells(cursor, 1)
@@ -229,24 +261,41 @@ class ExcelFinalizer:
 
         self._pt_counter += 1
         name = f"PT_{self._pt_counter}"
-        pc = wb.PivotCaches().Create(SourceType=XL_DATABASE,
-                                     SourceData=source_table.Name)
-        pt = pc.CreatePivotTable(TableDestination=ws.Cells(dest_row, 1),
-                                 TableName=name)
+        pt = shared_cache.CreatePivotTable(TableDestination=ws.Cells(dest_row, 1),
+                                           TableName=name)
 
-        # Add row fields so the grouped DATE stays OUTERMOST: add+group the date
-        # first, then the remaining dimensions become inner fields.
-        remaining = list(spec.row_fields)
+        # Lay the date (Year/Month) in the COLUMN panel — spread left-to-right
+        # beside the row titles — WHENEVER there is a row dimension, so the GM can
+        # compare months/years across the page. A date-only pivot (no other
+        # dimension) keeps the date down the ROWS as a simple month list.
         date_field = spec.group_date_field
-        if date_field and date_field in remaining:
-            pt.PivotFields(date_field).Orientation = XL_ROW_FIELD
+        other_rows = [r for r in spec.row_fields if r != date_field]
+        date_in_columns = bool(date_field and other_rows)
+        date_orient = XL_COLUMN_FIELD if date_in_columns else XL_ROW_FIELD
+
+        if date_field and date_field in spec.row_fields:
             try:
-                cell = pt.PivotFields(date_field).DataRange.Cells(1, 1)
-                cell.Group(Start=True, End=True, Periods=GROUP_MONTH_YEAR)
+                pf = pt.PivotFields(date_field)
+                pf.Orientation = date_orient
+                # Group by Month + Year (once per shared cache; inherited after).
+                try:
+                    pf.DataRange.Cells(1, 1).Group(Start=True, End=True,
+                                                   Periods=GROUP_MONTH_YEAR)
+                    self._date_grouped = True
+                except Exception:
+                    pass
+                # Grouping creates a "Years" field — place it as the OUTER date
+                # band (Year then Month), in the same panel as the month field.
+                try:
+                    yf = pt.PivotFields("Years")
+                    yf.Orientation = date_orient
+                    yf.Position = 1
+                except Exception:
+                    pass
             except Exception as exc:                  # noqa: BLE001
-                self.notes.append(f"Could not group dates for {date_field}: {exc}")
-            remaining = [r for r in remaining if r != date_field]
-        for rf in remaining:
+                self.notes.append(f"Could not place date for {date_field}: {exc}")
+
+        for rf in other_rows:
             pt.PivotFields(rf).Orientation = XL_ROW_FIELD
 
         for df in spec.data_fields:
@@ -428,6 +477,52 @@ class ExcelFinalizer:
             fc.Font.Bold = True
         except Exception:
             pass
+
+    # -- keep helper columns hidden -------------------------------------------
+    def _hide_helper_columns(self, wb, data_sheet) -> None:
+        """Re-hide the engine's helper columns on the data sheet — decoded-name
+        ``"… (Name)"`` and sign-flipped ``"… (+)"`` columns. openpyxl marks them
+        hidden, but re-saving through Excel/COM can surface them; this guarantees
+        the user never sees the internal helpers."""
+        if not data_sheet:
+            return
+        try:
+            ws = wb.Worksheets(data_sheet)
+        except Exception:
+            return
+        used = ws.UsedRange
+        first_row = used.Row
+        ncols = used.Columns.Count
+        base = used.Column
+        for i in range(ncols):
+            c = base + i
+            try:
+                header = ws.Cells(first_row, c).Value
+            except Exception:
+                continue
+            name = str(header) if header is not None else ""
+            if name.endswith(" (Name)") or name.endswith(" (+)"):
+                try:
+                    ws.Columns(c).Hidden = True
+                except Exception:
+                    pass
+
+    # -- canonical tab order --------------------------------------------------
+    def _order_sheets(self, wb) -> None:
+        """Sequence the analysis tabs AFTER the data sheet(s):
+        KPI → Pivot → Smart Tables → Insights → Executive Summary → Dashboard.
+        Moving each present sheet to the end in this order leaves them in
+        sequence at the tail, with the data sheet(s) untouched at the front."""
+        from .constants import ordered_output_layout  # noqa: PLC0415
+        for base in ordered_output_layout():
+            try:
+                ws = wb.Worksheets(base)
+            except Exception:
+                continue            # this sheet wasn't produced this run
+            try:
+                ws.Move(After=wb.Worksheets(wb.Worksheets.Count))
+            except Exception:
+                pass
 
     # -- req 9: autofit -------------------------------------------------------
     def _autofit_all(self, wb, skip_sheets: set) -> None:

@@ -204,12 +204,26 @@ class InsightsAnalyzer(Analyzer):
         self.insights = insights
         self.semantic = sem
 
+        purpose_txt = (f"Purpose: {sem.purpose} report" if sem.purpose
+                       else _REPORT_LABEL.get(sem.report_type))
         spec = SheetSpec(
             name=SHEET_INSIGHTS, heading="Insights",
-            subheading=(f"{_REPORT_LABEL.get(sem.report_type)}  •  "
+            subheading=(f"{purpose_txt}  •  "
                         f"Source: {table.sheet_name}  •  {table.row_count:,} records"),
         )
         spec.kpi_tiles = self._scorecard(profile, sem, insights)
+
+        # State the detected purpose up front, with the evidence behind it.
+        if sem.purpose and sem.category_totals:
+            top_cats = sorted(sem.category_totals.items(),
+                              key=lambda kv: kv[1], reverse=True)[:3]
+            cats = ", ".join(c for c, _ in top_cats)
+            spec.text_blocks.append(TextBlock(
+                "What this workbook is about",
+                [f"This looks like a {sem.purpose.upper()} report — the account "
+                 f"codes resolve mainly to: {cats}. The analysis below is framed "
+                 f"accordingly."],
+                style="highlight"))
 
         # Bottom line = the single most important finding.
         if insights:

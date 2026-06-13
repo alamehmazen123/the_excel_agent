@@ -74,12 +74,18 @@ class HeaderEntry:
 
 @dataclass
 class CodeMap:
-    """A domain dictionary of code -> definition (e.g. all guarantors)."""
+    """A domain dictionary of code -> definition (e.g. all guarantors).
+
+    Optionally each code also carries a CATEGORY (e.g. account 713… → "revenues",
+    601… → "purchases"). The category lets the engine infer what a workbook is
+    ABOUT (revenue vs expense) from the codes it contains."""
     name: str                    # "guarantor", "department", ...
     label: str = ""              # human label for the domain
     entries: dict[str, str] = field(default_factory=dict)   # canonical -> definition
-    # Lookup index built from ``entries`` covering every code variant.
+    categories: dict[str, str] = field(default_factory=dict)  # canonical -> category
+    # Lookup indices built from ``entries`` / ``categories`` over every variant.
     _index: dict[str, str] = field(default_factory=dict, repr=False)
+    _cat_index: dict[str, str] = field(default_factory=dict, repr=False)
 
     def reindex(self) -> "CodeMap":
         self._index = {}
@@ -87,11 +93,23 @@ class CodeMap:
             for v in code_variants(code):
                 # First write wins so an explicit literal beats an int collision.
                 self._index.setdefault(v, definition)
+        self._cat_index = {}
+        for code, category in self.categories.items():
+            for v in code_variants(code):
+                self._cat_index.setdefault(v, category)
         return self
 
     def lookup(self, value: Any) -> Optional[str]:
         for v in code_variants(value):
             hit = self._index.get(v)
+            if hit is not None:
+                return hit
+        return None
+
+    def category_of(self, value: Any) -> Optional[str]:
+        """The financial category of a code (e.g. 'revenues'), if known."""
+        for v in code_variants(value):
+            hit = self._cat_index.get(v)
             if hit is not None:
                 return hit
         return None
@@ -186,8 +204,11 @@ def load_library() -> Library:
     code_maps: dict[str, CodeMap] = {}
     for name, m in maps_raw.items():
         entries = {norm_code(k): str(val) for k, val in m.get("entries", {}).items()}
+        categories = {norm_code(k): str(val).lower()
+                      for k, val in m.get("categories", {}).items()}
         code_maps[name] = CodeMap(
-            name=name, label=m.get("label", name), entries=entries
+            name=name, label=m.get("label", name), entries=entries,
+            categories=categories,
         ).reindex()
 
     meta = _read_json(_META_FILE, {})
@@ -207,7 +228,8 @@ def save_library(lib: Library) -> None:
     codes_out = {
         "version": 1,
         "maps": {
-            name: {"label": cm.label, "entries": cm.entries}
+            name: ({"label": cm.label, "entries": cm.entries}
+                   | ({"categories": cm.categories} if cm.categories else {}))
             for name, cm in lib.code_maps.items()
         },
     }

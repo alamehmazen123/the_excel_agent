@@ -27,6 +27,22 @@ _MIN_COVERAGE = 0.5
 _CODE_TYPES = (ColumnType.CATEGORICAL, ColumnType.TEXT, ColumnType.IDENTIFIER)
 
 
+_HELPER_SUFFIX = " (Name)"
+
+
+def friendly_name(name: str, library: Optional[Library] = None) -> str:
+    """A reader-friendly label for a column name, for use on EVERY sheet.
+
+    * a decoded helper ``"ACTTNUMB (Name)"`` → the glossary meaning of its source
+      header (``"Department Account Name"``);
+    * any other header → its glossary meaning, or the header itself if unknown.
+    So codes/abbreviations are never shown raw when the library knows better.
+    """
+    lib = library if library is not None else get_library()
+    base = name[:-len(_HELPER_SUFFIX)] if name.endswith(_HELPER_SUFFIX) else name
+    return lib.meaning_of(base)
+
+
 @dataclass
 class DecodeCol:
     source_name: str          # e.g. "FLD1"

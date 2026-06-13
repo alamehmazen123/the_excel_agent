@@ -19,10 +19,16 @@ class GroqNarrator:
     """Callable that turns a metrics dict into narrative text, or None."""
 
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL,
-                 timeout: float = 30.0, retries: int = 1) -> None:
+                 timeout: float = 20.0, retries: int = 0,
+                 connect_timeout: float = 6.0) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model or DEFAULT_MODEL
         self.timeout = timeout
+        # Short, separate CONNECT timeout so a hospital firewall that silently
+        # DROPS packets to api.groq.com fails in seconds and falls back to the
+        # deterministic summary — instead of stalling the whole generation (the
+        # symptom: a progress bar stuck on "Building Executive Summary…").
+        self.connect_timeout = connect_timeout
         self.retries = max(0, retries)
         self.last_error: Optional[str] = None
 
@@ -54,7 +60,7 @@ class GroqNarrator:
         for attempt in range(self.retries + 1):
             try:
                 resp = requests.post(GROQ_BASE_URL, json=payload, headers=headers,
-                                     timeout=self.timeout)
+                                     timeout=(self.connect_timeout, self.timeout))
                 if resp.status_code == 200:
                     data = resp.json()
                     text = data["choices"][0]["message"]["content"].strip()

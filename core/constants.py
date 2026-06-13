@@ -14,3 +14,12 @@ def output_sheet_names() -> list[str]:
     """All sheet names the engine may create -- skipped when re-analyzing."""
     return [SHEET_INSIGHTS, SHEET_DASHBOARD, SHEET_PIVOT, SHEET_KPI,
             SHEET_SUMMARY, SHEET_SMART]
+
+
+def ordered_output_layout() -> list[str]:
+    """Canonical left-to-right tab order for the analysis sheets, placed AFTER
+    the data sheet(s):  KPI -> Pivot -> Smart Tables -> Insights -> Executive
+    Summary -> Dashboard. Used by both the openpyxl writer and the Excel COM
+    finalizer so the workbook always reads in this order."""
+    return [SHEET_KPI, SHEET_PIVOT, SHEET_SMART, SHEET_INSIGHTS,
+            SHEET_SUMMARY, SHEET_DASHBOARD]
