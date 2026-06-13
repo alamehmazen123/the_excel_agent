@@ -86,6 +86,10 @@ class ExcelFinalizer:
             excel.EnableEvents = False
             excel.AutomationSecurity = 3        # msoAutomationSecurityForceDisable
             excel.Application.DisplayAlerts = False
+            # CRITICAL for big books: manual calc + no screen updates so a 80k-row
+            # sheet doesn't recalculate after every pivot field is added (that was
+            # the "stuck for an hour" hang). Restored implicitly when Excel quits.
+            excel.Calculation = -4135           # xlCalculationManual
         except Exception:
             pass
         wb = None
@@ -121,7 +125,7 @@ class ExcelFinalizer:
             except Exception:
                 pass
             try:
-                self._autofit_all(wb, skip_sheets=skip_sheets)
+                self._autofit_all(wb, skip_sheets=skip_sheets, data_sheet=data_sheet)
             except Exception:
                 pass
             try:
@@ -263,40 +267,34 @@ class ExcelFinalizer:
         name = f"PT_{self._pt_counter}"
         pt = shared_cache.CreatePivotTable(TableDestination=ws.Cells(dest_row, 1),
                                            TableName=name)
+        # Defer recomputation until ALL fields are placed — otherwise Excel
+        # re-aggregates the whole 80k-row source after every single field, which
+        # is the difference between seconds and an hour on a big book.
+        try:
+            pt.ManualUpdate = True
+        except Exception:
+            pass
 
-        # Lay the date (Year/Month) in the COLUMN panel — spread left-to-right
-        # beside the row titles — WHENEVER there is a row dimension, so the GM can
-        # compare months/years across the page. A date-only pivot (no other
-        # dimension) keeps the date down the ROWS as a simple month list.
+        # Date goes in the COLUMN panel (months across, beside the row titles)
+        # WHENEVER there is a row dimension; a date-only pivot keeps it in ROWS.
         date_field = spec.group_date_field
         other_rows = [r for r in spec.row_fields if r != date_field]
         date_in_columns = bool(date_field and other_rows)
-        date_orient = XL_COLUMN_FIELD if date_in_columns else XL_ROW_FIELD
 
+        # Place the date in ROWS FIRST. Grouping needs a rendered range, and an
+        # UNgrouped date in the COLUMN panel would briefly explode into hundreds
+        # of day-columns; in rows it's cheap. We group it, then (if needed) move
+        # the small grouped band to the columns. Dimensions go straight to rows.
         if date_field and date_field in spec.row_fields:
             try:
-                pf = pt.PivotFields(date_field)
-                pf.Orientation = date_orient
-                # Group by Month + Year (once per shared cache; inherited after).
-                try:
-                    pf.DataRange.Cells(1, 1).Group(Start=True, End=True,
-                                                   Periods=GROUP_MONTH_YEAR)
-                    self._date_grouped = True
-                except Exception:
-                    pass
-                # Grouping creates a "Years" field — place it as the OUTER date
-                # band (Year then Month), in the same panel as the month field.
-                try:
-                    yf = pt.PivotFields("Years")
-                    yf.Orientation = date_orient
-                    yf.Position = 1
-                except Exception:
-                    pass
-            except Exception as exc:                  # noqa: BLE001
-                self.notes.append(f"Could not place date for {date_field}: {exc}")
-
+                pt.PivotFields(date_field).Orientation = XL_ROW_FIELD
+            except Exception:
+                pass
         for rf in other_rows:
-            pt.PivotFields(rf).Orientation = XL_ROW_FIELD
+            try:
+                pt.PivotFields(rf).Orientation = XL_ROW_FIELD
+            except Exception:
+                pass
 
         for df in spec.data_fields:
             # A USD-converted measure is a pivot CalculatedField (= base / rate).
@@ -326,6 +324,36 @@ class ExcelFinalizer:
             pt.ColumnGrand = True
         except Exception:
             pass
+
+        # Render the pivot ONCE now that every field is placed.
+        try:
+            pt.ManualUpdate = False
+        except Exception:
+            pass
+
+        # Group the date by Month + Year (needs the rendered range). On the shared
+        # cache this happens effectively once; later pivots inherit the grouping.
+        if date_field and date_field in spec.row_fields:
+            try:
+                pt.PivotFields(date_field).DataRange.Cells(1, 1).Group(
+                    Start=True, End=True, Periods=GROUP_MONTH_YEAR)
+                self._date_grouped = True
+            except Exception:
+                pass
+            # Move the now-small grouped band (Year → Month) to the COLUMN panel
+            # when a row dimension exists; otherwise keep it in ROWS.
+            target = XL_COLUMN_FIELD if date_in_columns else XL_ROW_FIELD
+            try:
+                pt.PivotFields(date_field).Orientation = target
+            except Exception:
+                pass
+            try:
+                yf = pt.PivotFields("Years")
+                yf.Orientation = target
+                yf.Position = 1
+            except Exception:
+                pass
+
         # NOTE: sorting + conditional formatting are applied in a SECOND pass
         # (see _build_plan) once every pivot exists, and we deliberately do NOT
         # enable RefreshOnFileOpen -- both a later date-group on the shared cache
@@ -344,16 +372,19 @@ class ExcelFinalizer:
         except Exception:
             return
 
-        # Hide non-top items (PivotItems must be CALLED).
+        # Hide non-top items (PivotItems must be CALLED). Each toggle is a COM
+        # round-trip, so on a field with thousands of distinct values this would
+        # crawl — skip the per-item hide above a sane cap and rely on AutoSort.
         if visible_items:
             allow = {str(v) for v in visible_items}
             try:
                 items = pf.PivotItems()
-                for i in range(1, items.Count + 1):
-                    it = items.Item(i)
-                    want = str(it.Name) in allow
-                    if bool(it.Visible) != want:
-                        it.Visible = want
+                if items.Count <= 400:
+                    for i in range(1, items.Count + 1):
+                        it = items.Item(i)
+                        want = str(it.Name) in allow
+                        if bool(it.Visible) != want:
+                            it.Visible = want
             except Exception:
                 pass
 
@@ -525,10 +556,19 @@ class ExcelFinalizer:
                 pass
 
     # -- req 9: autofit -------------------------------------------------------
-    def _autofit_all(self, wb, skip_sheets: set) -> None:
+    def _autofit_all(self, wb, skip_sheets: set, data_sheet=None) -> None:
+        """AutoFit ONLY the (small) output sheets. AutoFit on the raw data sheet
+        of an 80k-row book scans millions of cells and can take an hour — that
+        was a primary cause of the 'stuck on Auto-Generate' hang. The data sheet
+        and any large sheet are skipped."""
         for ws in wb.Worksheets:
-            if ws.Name in skip_sheets:
+            if ws.Name in skip_sheets or ws.Name == data_sheet:
                 continue
+            try:
+                if ws.UsedRange.Rows.Count > 3000:
+                    continue            # large data sheet -> AutoFit is too slow
+            except Exception:
+                pass
             try:
                 ws.Columns.AutoFit()
             except Exception:

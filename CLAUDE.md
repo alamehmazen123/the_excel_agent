@@ -19,7 +19,25 @@ Summary, Smart Tables** — to the *same* workbook, leaving the original data sh
   built by automating Excel via COM). Without Excel it falls back to static tables.
 - The user must never see Python, a terminal, PowerShell, or a config file.
 
-Current version is in `config.py` → `APP_VERSION` (currently `1.14.0`).
+Current version is in `config.py` → `APP_VERSION` (currently `1.14.1`).
+
+### v1.14.1 — the "stuck for an hour on 80k rows" hang, fixed for good
+Root causes on a large book (80k+ rows), all in `excel_com.py`:
+- **`pt.ManualUpdate = True` while building each pivot**, then `False` once at the
+  end. Without it Excel re-aggregated the whole 80k-row source after EVERY field
+  was added (~5 ops × ~9 pivots = dozens of full recomputations). This was the
+  dominant hang.
+- **`excel.Calculation = xlCalculationManual`** for the whole COM session.
+- **AutoFit never runs on the data sheet** (`_autofit_all` skips the data sheet and
+  any sheet > 3000 rows) — AutoFit scans every cell and on 80k×30 took ~forever.
+- **Date grouped AFTER a single render with the date in ROWS, then moved to the
+  COLUMN panel** — an UNgrouped date placed straight into columns would briefly
+  explode into hundreds of day-columns; in rows it's cheap, then it collapses to
+  ≤24 month/year groups before moving across.
+- **Per-item Top-N hide capped at 400 items** (`_sort_and_limit`) — each toggle is
+  a COM round-trip; thousands of them on a wide field crawled.
+Measured: an 80k-row × 2-year book now finishes the FULL run in ~120 s (pivot
+stage ~42 s), 8.6 MB — previously it hung indefinitely.
 
 ### v1.14.0 — every sheet enhanced (GM-grade), big-file performance fix
 - **Shared PivotCache (`excel_com._build_plan`)**: ONE cache for all pivots instead
