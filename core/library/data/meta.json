@@ -20,7 +20,13 @@
       "file": "HEADER subtabs for header FLD1 and description library.xlsx",
       "headers": 0,
       "kind": "codes"
+    },
+    {
+      "category": "account",
+      "codes": 248,
+      "file": "header with category and description.xlsx",
+      "kind": "account-categories"
     }
   ],
-  "updated": "2026-06-12T10:51:19.463548+00:00"
+  "updated": "2026-06-13T10:15:31.179081+00:00"
 }

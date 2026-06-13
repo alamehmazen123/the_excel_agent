@@ -56,21 +56,23 @@ class SmartTablesAnalyzer(Analyzer):
 
     def applies_to(self, profile: WorkbookProfile) -> bool:
         t = profile.primary
+        # Smart Tables apply to ANY workbook with a value measure and a date:
+        # decoded code columns become real names when the library knows them, and
+        # plain categoricals are grouped by month otherwise. (Previously this
+        # required a decoded helper, which made the checkbox silently un-tick on
+        # files the library doesn't recognise — it stays available now.)
         if not t or t.row_count == 0 or not t.value_measures or not t.date_columns:
             return False
-        if self.library.is_empty:
-            return False
-        # Only meaningful once the library has DECODED something in this workbook
-        # (a hidden helper column was injected). Otherwise the Pivot/Dashboard
-        # sheets already cover plain categorical breakdowns.
-        return any(c.is_decoded_helper for c in t.columns)
+        return bool(self._dimensions(t))
 
     # -- internals ---------------------------------------------------------- #
     def _dimensions(self, table: TableProfile) -> list[ColumnProfile]:
         """Readable grouping columns: decoded helpers first, then plain
-        categoricals (already human-readable name columns)."""
+        categoricals. The raw CODE column (whose decoded helper exists) is
+        excluded so tables group by real names, never cryptic codes."""
         helpers = [c for c in table.columns if c.is_decoded_helper]
-        cats = [c for c in table.dimensions if not c.is_decoded_helper]
+        cats = [c for c in table.dimensions
+                if not c.is_decoded_helper and not c.decoded_helper]
         return helpers + cats
 
     def _fmt_for(self, measure: ColumnProfile) -> NumberFormat:
@@ -109,27 +111,31 @@ class SmartTablesAnalyzer(Analyzer):
             ))
             produced += 1
 
-        # Scenario B: each readable dimension x each value measure, month-grouped.
+        # Scenario B: each readable dimension × value measure as a MONTHS-ACROSS
+        # cross-tab — decoded names down the rows, months across the columns, a
+        # Total column on the right — the layout a manager reads left-to-right.
+        from ..decode import friendly_name  # noqa: PLC0415
+        from ..aggregate import crosstab_period  # noqa: PLC0415
         for dim in dims:
             if produced >= _MAX_TABLES:
                 break
-            dim_title = self.library.meaning_of(dim.name)
+            dim_title = friendly_name(dim.name, self.library)
             for m in value_measures[:2]:
                 if produced >= _MAX_TABLES:
                     break
-                rows = group_period_dim(table, date_col, dim, m,
-                                        top_n=_ROWS_PER_TABLE)
-                if not rows:
+                periods, rows = crosstab_period(table, date_col, dim, m)
+                if not rows or not periods:
                     continue
+                headers = [dim_title] + [_fmt_period(p) for p in periods] + ["Total"]
+                body = [[label] + [round(cells.get(p, 0.0), 2) for p in periods]
+                        + [round(tot, 2)] for label, cells, tot in rows]
+                fmts = ([NumberFormat.GENERAL]
+                        + [self._fmt_for(m)] * len(periods) + [self._fmt_for(m)])
                 spec.tables.append(DataTable(
-                    title=f"Total {m.name} by {date_col.name} (Month) & {dim_title}",
-                    headers=[f"{date_col.name} (Month)", dim_title,
-                             f"Total {m.name}", "Records"],
-                    rows=[[_fmt_period(p), label, round(t, 2), c]
-                          for p, label, t, c in rows],
-                    formats=[NumberFormat.GENERAL, NumberFormat.GENERAL,
-                             self._fmt_for(m), NumberFormat.INTEGER],
-                    bar_columns=[2],          # data bar on the value total
+                    title=f"{friendly_name(m.name)} by {dim_title} — month by month",
+                    headers=headers, rows=body, formats=fmts,
+                    bar_columns=[len(headers) - 1],          # data bar on Total
+                    scale_columns=list(range(1, len(periods) + 1)),  # heat the months
                 ))
                 produced += 1
 

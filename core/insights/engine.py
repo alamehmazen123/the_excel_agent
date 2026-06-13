@@ -167,14 +167,15 @@ def _concentration(table: TableProfile, sem: SemanticModel) -> list[Insight]:
         sev = (Severity.HIGH if leader_share >= _CONC_HIGH
                else Severity.WATCH if leader_share >= _CONC_WATCH
                else Severity.INFO)
+        dim_label = _label(dim.name)
         out.append(Insight(
             kind=InsightKind.CONCENTRATION, severity=sev,
-            title=f"{n80} of {len(ranked)} {dim.name} drive 80% of {pm.meaning}",
+            title=f"{n80} of {len(ranked)} {dim_label} drive 80% of {pm.meaning}",
             detail=(f"{ranked[0][0]} alone is {leader_share * 100:.0f}% of "
                     f"{pm.meaning} ({fmt_measure(pm.column, ranked[0][1])}); "
-                    f"the top {n80} of {len(ranked)} {dim.name} make up 80%."),
+                    f"the top {n80} of {len(ranked)} {dim_label} make up 80%."),
             score=_clamp01(leader_share), good=False if sev == Severity.HIGH else None,
-            measure=pm.name, dimension=dim.name,
+            measure=pm.name, dimension=dim_label,
             evidence={"leader": ranked[0][0], "leader_share": leader_share,
                       "n80": n80, "items": ranked[:8]},
         ))
@@ -336,12 +337,24 @@ def _losses(table: TableProfile, sem: SemanticModel) -> list[Insight]:
 # Shared helpers                                                              #
 # --------------------------------------------------------------------------- #
 def _dimensions(table: TableProfile) -> list[ColumnProfile]:
-    """Readable grouping columns: decoded helpers first, then plain categoricals,
-    excluding near-unique / single-value columns (handled by pivot_dimensions)."""
+    """Readable grouping columns: decoded helpers first, then plain categoricals.
+    The raw CODE column (the one whose decoded helper exists) is excluded so we
+    never group/label by cryptic codes when a decoded name is available."""
     helpers = [c for c in table.columns if c.is_decoded_helper]
-    plain = [c for c in table.pivot_dimensions if not c.is_decoded_helper]
     seen = {c.name for c in helpers}
-    return helpers + [c for c in plain if c.name not in seen]
+    plain = [c for c in table.pivot_dimensions
+             if not c.is_decoded_helper and not c.decoded_helper
+             and c.name not in seen]
+    return helpers + plain
+
+
+def _label(name: str) -> str:
+    """Reader-friendly header label (decodes helper/abbreviation via the library)."""
+    try:
+        from ..decode import friendly_name  # noqa: PLC0415 (avoid import cycle)
+        return friendly_name(name)
+    except Exception:
+        return name
 
 
 def _as_date(v: Any) -> Optional[_dt.date]:

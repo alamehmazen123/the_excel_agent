@@ -14,9 +14,10 @@ analysed, just without the domain phrasing.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from .formatting import is_dollar_column
 from .models import ColumnProfile, ColumnType, TableProfile, WorkbookProfile
@@ -135,6 +136,17 @@ class SemanticModel:
     report_type: ReportType = ReportType.GENERIC
     measures: list[MeasureSemantic] = field(default_factory=list)
     table: Optional[TableProfile] = None
+    # Goal/purpose inferred from the account-code categories (the library knows
+    # 713… = revenues, 601… = purchases, …). ``purpose`` is a human label shown
+    # to the reader; ``purpose_kind`` is the metric nature it implies.
+    purpose: str = ""
+    purpose_kind: Optional[MetricKind] = None
+    account_column: Optional[str] = None     # the code column the purpose came from
+    category_totals: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def is_revenue_report(self) -> bool:
+        return self.purpose_kind == MetricKind.REVENUE
 
     # -- convenience accessors used by the insight engine ------------------- #
     def of_kind(self, *kinds: MetricKind) -> list[MeasureSemantic]:
@@ -198,6 +210,98 @@ def _detect_report_type(table: TableProfile, meanings: dict[str, str],
     return best if scores[best] >= 2 else ReportType.GENERIC
 
 
+# Map an account-category banner to the metric nature it implies.
+_EXPENSE_WORDS = ("expense", "purchase", "salary", "salaries", "tax",
+                  "maintenance", "insurance", "fuel", "office", "marketing",
+                  "donation", "bank charge", "general", "supplies")
+
+
+def _nature_of_category(category: str) -> Optional[MetricKind]:
+    c = (category or "").lower()
+    if "revenue" in c or "income" in c or "sales" in c:
+        return MetricKind.REVENUE
+    if any(w in c for w in _EXPENSE_WORDS):
+        return MetricKind.COST
+    if "cash" in c or "bank account" in c:
+        return MetricKind.BALANCE
+    return None
+
+
+_PURPOSE_LABEL = {
+    MetricKind.REVENUE: "Revenue",
+    MetricKind.COST: "Expenses",
+    MetricKind.BALANCE: "Cash & balances",
+}
+
+
+def _distinct(table: TableProfile, col: ColumnProfile, limit: int = 300) -> list[Any]:
+    out, seen = [], set()
+    for row in table.rows:
+        v = row.get(col.name)
+        if v in (None, ""):
+            continue
+        k = str(v)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(v)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _detect_purpose(table: TableProfile, library,
+                    money: Optional[ColumnProfile]) -> Optional[tuple]:
+    """Infer what the workbook is ABOUT from its account-code categories.
+
+    Finds the code column whose library map carries categories, then sums the
+    money (or row counts) per category. Returns (code_col_name, dominant_kind,
+    purpose_label, category_totals) or None."""
+    if library is None or getattr(library, "is_empty", True):
+        return None
+    best = None                       # (col, code_map, coverage)
+    for col in table.columns:
+        if col.is_decoded_helper or col.ctype not in (
+                ColumnType.CATEGORICAL, ColumnType.TEXT, ColumnType.IDENTIFIER):
+            continue
+        vals = _distinct(table, col)
+        cm = library.best_map_for_values(vals)
+        if cm is None or not getattr(cm, "categories", None):
+            continue
+        cov = cm.coverage(vals)
+        if best is None or cov > best[2]:
+            best = (col, cm, cov)
+    if best is None:
+        return None
+
+    col, cm, _cov = best
+    totals: dict[str, float] = defaultdict(float)
+    for row in table.rows:
+        cat = cm.category_of(row.get(col.name))
+        if not cat:
+            continue
+        amt = 1.0
+        if money is not None:
+            v = row.get(money.name)
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                amt = abs(float(v)) or 1.0
+        totals[cat] += amt
+    if not totals:
+        return None
+
+    # Group the per-category money into metric natures, pick the dominant one.
+    by_nature: dict[MetricKind, float] = defaultdict(float)
+    for cat, amt in totals.items():
+        nat = _nature_of_category(cat)
+        if nat is not None:
+            by_nature[nat] += amt
+    if not by_nature:
+        return None
+    dominant = max(by_nature, key=by_nature.get)
+    label = _PURPOSE_LABEL.get(dominant, dominant.value.title())
+    return col.name, dominant, label, dict(totals)
+
+
 def analyze(profile: WorkbookProfile, library=None) -> SemanticModel:
     """Build a :class:`SemanticModel` for a workbook's primary table."""
     table = profile.primary
@@ -219,6 +323,28 @@ def analyze(profile: WorkbookProfile, library=None) -> SemanticModel:
         meaning = meanings.get(col.name, col.name)
         measures.append(MeasureSemantic(col, classify_metric(col, meaning), meaning))
 
-    kinds = [m.kind for m in measures]
-    rtype = _detect_report_type(table, meanings, kinds)
-    return SemanticModel(report_type=rtype, measures=measures, table=table)
+    model = SemanticModel(report_type=ReportType.GENERIC, measures=measures,
+                          table=table)
+
+    # Goal detection from account categories (overrides keyword guesses). The
+    # money weighting uses the strongest money measure available.
+    money = measures[0].column if measures and measures[0].kind.is_money else None
+    if money is None:
+        money = table.primary_value_measure
+    purpose = _detect_purpose(table, library, money)
+    if purpose is not None:
+        acol, kind, label, totals = purpose
+        model.purpose = label
+        model.purpose_kind = kind
+        model.account_column = acol
+        model.category_totals = totals
+        # Re-tag the money measures to the detected nature so revenue/expense
+        # logic (RAG direction, sign handling, narrative) is correct.
+        for m in measures:
+            if m.kind.is_money:
+                m.kind = kind
+        model.report_type = ReportType.FINANCIAL
+    else:
+        kinds = [m.kind for m in measures]
+        model.report_type = _detect_report_type(table, meanings, kinds)
+    return model

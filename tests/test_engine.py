@@ -47,7 +47,7 @@ def test_run_creates_sheets_and_keeps_original(sample):
     res = Engine().run(sample, AnalysisOptions())
     assert set(res.sheets_created) == {
         "Insights", "KPI Analysis", "Pivot Analysis", "Dashboard",
-        "Executive Summary"}
+        "Executive Summary", "Smart Tables"}
 
     wb1 = load_workbook(sample)
     for name, a1 in orig.items():

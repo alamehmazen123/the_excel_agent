@@ -66,11 +66,20 @@ def _usd_pair(col_name: str) -> DataFieldSpec:
                          USD_FORMAT, calc_formula=f"='{col_name}'/{USD_PER_LBP}")
 
 
+def _value_source(col: ColumnProfile) -> str:
+    """The sheet column a PivotTable should aggregate for this measure: the
+    hidden POSITIVE helper for a sign-flipped revenue column, else the column
+    itself."""
+    return getattr(col, "positive_helper", None) or col.name
+
+
 def value_fields(col: ColumnProfile, fmt: str, cap: str,
                  add_dollar: bool) -> list[DataFieldSpec]:
     """The native value field, plus a USD-converted field when requested and the
-    column isn't already in dollars."""
-    fields = [DataFieldSpec(col.name, XL_SUM, cap, fmt)]
+    column isn't already in dollars. A revenue column whose values are stored
+    negative is aggregated from its hidden positive helper, so the PivotTables
+    read positive — matching the openpyxl sheets — with originals untouched."""
+    fields = [DataFieldSpec(_value_source(col), XL_SUM, cap, fmt)]
     if add_dollar and not _is_dollar(col):
         fields.append(_usd_pair(col.name))
     return fields
@@ -258,13 +267,14 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection,
     # KPI Measure Statistics on the first chosen value measure.
     if value_measures:
         vcol, vfmt, vcap = value_measures[0]
+        vsrc = _value_source(vcol)
         plan.append(PivotSpec(
             SHEET_KPI, "Measure Statistics", [],
-            [DataFieldSpec(vcol.name, XL_SUM, vcap, vfmt),
-             DataFieldSpec(vcol.name, XL_AVERAGE, f"Average {vcol.name}", vfmt),
-             DataFieldSpec(vcol.name, XL_COUNT, "Count", INT_FORMAT),
-             DataFieldSpec(vcol.name, XL_MIN, f"Min {vcol.name}", vfmt),
-             DataFieldSpec(vcol.name, XL_MAX, f"Max {vcol.name}", vfmt)]))
+            [DataFieldSpec(vsrc, XL_SUM, vcap, vfmt),
+             DataFieldSpec(vsrc, XL_AVERAGE, f"Average {vcol.name}", vfmt),
+             DataFieldSpec(vsrc, XL_COUNT, "Count", INT_FORMAT),
+             DataFieldSpec(vsrc, XL_MIN, f"Min {vcol.name}", vfmt),
+             DataFieldSpec(vsrc, XL_MAX, f"Max {vcol.name}", vfmt)]))
     return plan
 
 
@@ -352,14 +362,15 @@ def build_pivot_plan(profile: WorkbookProfile,
 
     # --- KPI sheet: Measure Statistics on the primary value measure ----------
     if value is not None:
+        vsrc = _value_source(value)
         plan.append(PivotSpec(
             SHEET_KPI, "Measure Statistics", [],
             [
-                DataFieldSpec(value.name, XL_SUM, value_caption, vfmt),
-                DataFieldSpec(value.name, XL_AVERAGE, f"Average {value.name}", vfmt),
-                DataFieldSpec(value.name, XL_COUNT, "Count", INT_FORMAT),
-                DataFieldSpec(value.name, XL_MIN, f"Min {value.name}", vfmt),
-                DataFieldSpec(value.name, XL_MAX, f"Max {value.name}", vfmt),
+                DataFieldSpec(vsrc, XL_SUM, value_caption, vfmt),
+                DataFieldSpec(vsrc, XL_AVERAGE, f"Average {value.name}", vfmt),
+                DataFieldSpec(vsrc, XL_COUNT, "Count", INT_FORMAT),
+                DataFieldSpec(vsrc, XL_MIN, f"Min {value.name}", vfmt),
+                DataFieldSpec(vsrc, XL_MAX, f"Max {value.name}", vfmt),
             ]))
 
     return plan

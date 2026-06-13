@@ -76,17 +76,26 @@ def test_smart_tables_decodes_and_groups() -> None:
     spec = analyzer.run(profile)
     assert spec is not None and spec.tables
 
-    # A table grouped by month & the decoded DEPT names should exist.
-    decoded = [t for t in spec.tables if "DEPT (Name)" in t.title]
+    # A months-across cross-tab for the decoded DEPT names should exist; its title
+    # uses the FRIENDLY header ("Department"), not the raw helper "DEPT (Name)".
+    decoded = [t for t in spec.tables if "Department" in t.title]
     assert decoded, [t.title for t in spec.tables]
-    labels = [r[1] for r in decoded[0].rows]       # col 1 = decoded dimension
+    labels = [r[0] for r in decoded[0].rows]       # col 0 = decoded dimension
     assert "Cardiology" in labels and "001" not in labels
-    assert all("-" in str(r[0]) for r in decoded[0].rows)   # month label like 'Jan-26'
+    # Months run ACROSS the columns now (headers like 'Jan-26'), plus a Total.
+    assert any("-" in str(h) for h in decoded[0].headers[1:])
+    assert decoded[0].headers[-1] == "Total"
 
 
-def test_empty_library_does_not_apply() -> None:
+def test_empty_library_still_applies_with_raw_names() -> None:
+    # Smart Tables now apply to any value+date+dimension workbook; without a
+    # library the dimensions just stay as their raw (undecoded) names. The
+    # checkbox must NOT silently un-tick on unrecognised files.
     analyzer = SmartTablesAnalyzer(library=Library())
-    assert not analyzer.applies_to(_profile_with_codes())
+    profile = _profile_with_codes()                 # has Date + DEPT + Revenue
+    assert analyzer.applies_to(profile)
+    spec = analyzer.run(profile)
+    assert spec is not None and spec.tables
 
 
 def test_currency_defaults_to_lbp() -> None:

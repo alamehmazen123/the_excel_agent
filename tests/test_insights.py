@@ -100,6 +100,55 @@ def test_insights_are_ranked_and_capped():
     assert keys == sorted(keys, reverse=True)
 
 
+def _revenue_profile():
+    """A revenue book: ACTTNUMB revenue account codes + NEGATIVE LBP amounts."""
+    codes = ["719300100001", "713000100201", "713000100202", "713000100203"]
+    rows = []
+    for m in range(1, 7):
+        for j, code in enumerate(codes):
+            d = _dt.datetime(2026, m, 15)
+            amt = (100 + m * 10 + j) * 100_000.0
+            rows.append({"TRDATE": d, "ACTTNUMB": code,
+                         "ORG_AMOUNT": -amt, "USD": amt / 90000})
+    date_c = _col("TRDATE", ColumnType.DATE, index=0)
+    acct_c = _col("ACTTNUMB", ColumnType.CATEGORICAL, index=1, distinct=4, count=24)
+    org_c = _col("ORG_AMOUNT", ColumnType.CURRENCY, index=2, number_format='#,##0" LBP"',
+                 count=24, total=sum(r["ORG_AMOUNT"] for r in rows),
+                 mean=sum(r["ORG_AMOUNT"] for r in rows) / 24,
+                 minimum=min(r["ORG_AMOUNT"] for r in rows),
+                 maximum=max(r["ORG_AMOUNT"] for r in rows))
+    usd_c = _col("USD", ColumnType.CURRENCY, index=3, number_format='"$"#,##0.00',
+                 count=24, total=sum(r["USD"] for r in rows))
+    table = TableProfile(sheet_name="GL", header_row=1, first_data_row=2,
+                         last_data_row=25, first_col=1, last_col=4,
+                         columns=[date_c, acct_c, org_c, usd_c], rows=rows)
+    return WorkbookProfile(path="x.xlsx", sheet_names=["GL"], tables=[table])
+
+
+def test_purpose_detected_as_revenue_from_account_codes():
+    from core.library import get_library
+    profile = _revenue_profile()
+    sem = analyze(profile, get_library())
+    # The library knows 713…/719… are revenue accounts → purpose is Revenue.
+    assert sem.purpose == "Revenue"
+    assert sem.purpose_kind == MetricKind.REVENUE
+    assert sem.account_column == "ACTTNUMB"
+
+
+def test_revenue_sign_flip_makes_amounts_positive():
+    from core.pipeline import _apply_revenue_sign
+    profile = _revenue_profile()
+    helpers = _apply_revenue_sign(profile.primary)
+    org = profile.primary.column("ORG_AMOUNT")
+    usd = profile.primary.column("USD")
+    # LBP revenue column flipped positive, with a hidden positive helper named.
+    assert org.total > 0 and org.positive_helper == "ORG_AMOUNT (+)"
+    assert ("ORG_AMOUNT", "ORG_AMOUNT (+)") in helpers
+    assert all(r["ORG_AMOUNT"] > 0 for r in profile.primary.rows)
+    # The already-positive USD/$ column is left untouched (no helper).
+    assert usd.positive_helper is None
+
+
 def test_empty_profile_is_safe():
     empty = WorkbookProfile(path="x.xlsx")
     sem = analyze(empty)

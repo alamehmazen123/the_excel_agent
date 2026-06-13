@@ -85,8 +85,16 @@ class ExecutiveSummaryAnalyzer(Analyzer):
 
         measure = table.value_for(profile.preferred_value_name)
         if measure is not None:
+            from ..decode import friendly_name  # noqa: PLC0415
             grand = measure.total or 0.0
-            for dim in table.pivot_dimensions[:3]:
+            # Prefer decoded-name helpers and never break down by the raw code
+            # column (its helper carries the readable names).
+            helpers = [c for c in table.columns if c.is_decoded_helper]
+            seen = {c.name for c in helpers}
+            plain = [c for c in table.pivot_dimensions
+                     if not c.is_decoded_helper and not c.decoded_helper
+                     and c.name not in seen]
+            for dim in (helpers + plain)[:3]:
                 ranked = group_sum(table, dim, measure, top_n=10_000)
                 ranked.sort(key=lambda kv: kv[1], reverse=True)
                 if not ranked:
@@ -112,7 +120,7 @@ class ExecutiveSummaryAnalyzer(Analyzer):
                     return s if 0 <= s <= 100 else None
 
                 metrics["breakdowns"].append({
-                    "dimension": dim.name, "measure": measure.name,
+                    "dimension": friendly_name(dim.name), "measure": measure.name,
                     "distinct": dim.distinct,
                     "top_items": [{"label": k, "value_display": fmt_measure(measure, v),
                                    "share_pct": share(v)} for k, v in top],

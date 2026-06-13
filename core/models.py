@@ -50,6 +50,11 @@ class ColumnProfile:
     decoded_helper: Optional[str] = None
     # True for the hidden helper columns the engine injects (decoded names).
     is_decoded_helper: bool = False
+    # For a revenue book whose LBP amounts are stored NEGATIVE: the name of a
+    # HIDDEN sheet column holding the sign-flipped POSITIVE values. The COM
+    # PivotTables aggregate this real column (so SUM/AVG/MIN/MAX are all correct)
+    # while the original column is left untouched.
+    positive_helper: Optional[str] = None
 
     @property
     def is_measure(self) -> bool:

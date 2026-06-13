@@ -426,8 +426,50 @@ def _atomic_save(wb, source_path: str) -> None:
         raise
 
 
+def inject_positive_helpers(wb, table, helpers: list) -> list[str]:
+    """Write HIDDEN sign-flipped POSITIVE helper columns next to revenue money
+    columns (e.g. ``ORG_AMOUNT`` → hidden ``ORG_AMOUNT (+)``). The original
+    column is untouched; the COM PivotTables aggregate the positive helper so
+    they read naturally. ``helpers`` is ``[(source_col, helper_col), …]``."""
+    if not helpers:
+        return []
+    ws = wb[table.sheet_name] if table.sheet_name in wb.sheetnames else None
+    if ws is None:
+        return []
+    header_row = table.header_row
+    existing: dict[str, int] = {}
+    max_used = 0
+    for col in range(1, ws.max_column + 1):
+        val = ws.cell(row=header_row, column=col).value
+        if val is not None and str(val) != "":
+            max_used = col
+            existing[str(val)] = col
+    next_col = max_used + 1
+
+    written: list[str] = []
+    for source_name, helper_name in helpers:
+        src_idx = existing.get(source_name)
+        if src_idx is None:
+            continue
+        target_col = existing.get(helper_name, next_col)
+        if helper_name not in existing:
+            next_col += 1
+        src_fmt = ws.cell(row=table.first_data_row, column=src_idx).number_format
+        ws.cell(row=header_row, column=target_col, value=helper_name)
+        for r in range(table.first_data_row, table.last_data_row + 1):
+            raw = ws.cell(row=r, column=src_idx).value
+            cell = ws.cell(row=r, column=target_col)
+            cell.value = -raw if isinstance(raw, (int, float)) and not isinstance(raw, bool) else raw
+            cell.number_format = src_fmt
+        ws.column_dimensions[get_column_letter(target_col)].hidden = True
+        existing[helper_name] = target_col
+        written.append(helper_name)
+    return written
+
+
 def write_results(source_path: str, specs: list[SheetSpec],
-                  inject: Optional[tuple] = None) -> list[str]:
+                  inject: Optional[tuple] = None,
+                  value_helpers: Optional[tuple] = None) -> list[str]:
     """Regenerate the analysis sheets (removes prior output sheets first).
 
     ``inject`` (optional) is ``(table, decodes, library)``: hidden decoded-name
@@ -449,24 +491,37 @@ def write_results(source_path: str, specs: list[SheetSpec],
         except Exception:
             pass   # decoration is best-effort; never block sheet creation
 
+    if value_helpers is not None:
+        vtable, vhelpers = value_helpers
+        try:
+            inject_positive_helpers(wb, vtable, vhelpers)
+        except Exception:
+            pass
+
     _remove_existing_outputs(wb)
     created = [render_sheet(wb, s) for s in specs if s is not None]
-    _move_insights_first(wb)
+    _order_output_sheets(wb)
     _atomic_save(wb, source_path)
     return created
 
 
-def _move_insights_first(wb) -> None:
-    """Put the Insights sheet at the front so it's the first tab leadership sees.
-    Tab order only — sheet contents (including the original data) are untouched."""
-    from .constants import SHEET_INSIGHTS  # noqa: PLC0415
-    for ws in wb.worksheets:
-        if ws.title.split(" (")[0] == SHEET_INSIGHTS:
-            try:
-                wb.move_sheet(ws, -wb.worksheets.index(ws))
-            except Exception:
-                pass
-            break
+def _order_output_sheets(wb) -> None:
+    """Arrange the analysis tabs in the canonical order AFTER the data sheet(s):
+    KPI → Pivot → Smart Tables → Insights → Executive Summary → Dashboard.
+    Tab order only — sheet contents (including the original data) are untouched.
+    Sheets that weren't produced are simply skipped."""
+    from .constants import ordered_output_layout  # noqa: PLC0415
+    for base in ordered_output_layout():
+        for ws in wb.worksheets:
+            if ws.title.split(" (")[0] == base:
+                try:
+                    # Move this output sheet to the very end; doing this for each
+                    # sheet in order leaves them sequenced at the tail, with the
+                    # data sheet(s) untouched at the front.
+                    wb.move_sheet(ws, len(wb.worksheets) - 1 - wb.worksheets.index(ws))
+                except Exception:
+                    pass
+                break
 
 
 def append_sheets(source_path: str, specs: list[SheetSpec]) -> list[str]:
@@ -486,5 +541,6 @@ def append_sheets(source_path: str, specs: list[SheetSpec]) -> list[str]:
             if ws.title.split(" (")[0] == spec.name and len(wb.worksheets) > 1:
                 del wb[ws.title]
         created.append(render_sheet(wb, spec))
+    _order_output_sheets(wb)            # keep the canonical tab order after fallback
     _atomic_save(wb, source_path)
     return created

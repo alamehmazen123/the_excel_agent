@@ -19,7 +19,71 @@ Summary, Smart Tables** — to the *same* workbook, leaving the original data sh
   built by automating Excel via COM). Without Excel it falls back to static tables.
 - The user must never see Python, a terminal, PowerShell, or a config file.
 
-Current version is in `config.py` → `APP_VERSION` (currently `1.12.0`).
+Current version is in `config.py` → `APP_VERSION` (currently `1.14.0`).
+
+### v1.14.0 — every sheet enhanced (GM-grade), big-file performance fix
+- **Shared PivotCache (`excel_com._build_plan`)**: ONE cache for all pivots instead
+  of one-per-pivot. An 80k-row book went from ~46 MB + very slow (and pivots left
+  EMPTY when per-pivot caches exhausted resources) to a few MB and fast, with all
+  pivots populated. This was the "dashboard takes too long / pivots without values"
+  root cause.
+- **Date in the COLUMNS panel (`excel_com._build_one_pivot`, `XL_COLUMN_FIELD`)**:
+  the grouped Year/Month is placed as a COLUMN field (months spread left-to-right
+  beside the row titles) whenever the pivot has a row dimension; a date-only pivot
+  keeps the date in rows. Grouped once on the shared cache (`Years` field reused).
+- **KPI sheet broadened (`analyzers/kpi.py`)**: a full scorecard (total, avg/month,
+  best/lowest month, MoM, YoY, active months, top dimension) + a month-by-month
+  trend table (Δ%/share/cumulative) with a trend chart + Top-N decoded breakdowns
+  with % of total + a currency split. Emitted with or without Excel.
+- **Dashboard never blank (`analyzers/dashboard.py`)**: a real one-page dashboard
+  (tiles + up to 5 openpyxl charts: monthly trend, by-dimension bar, composition
+  pie, Pareto, year-over-year), decoded names. The COM `_build_dashboard_charts`
+  rebuild (which used to DELETE these and leave the sheet blank when pivots failed)
+  is no longer called.
+- **Smart Tables months-across (`aggregate.crosstab_period`)**: each decoded
+  dimension is a MONTHS-ACROSS cross-tab (names down the rows, months across the
+  columns, a Total column), Top-N + "Others" rollup, month heat color-scale.
+
+### v1.13.0 — account categories, purpose detection, decoded display, revenue sign
+Driven by the hospital's chart-of-accounts catalog (code / description / category):
+- **`CodeMap.categories`** (`core/library/store.py`): each account code now carries
+  a category (revenues / purchases / salaries / cash / …). `tools/ingest_account_categories.py`
+  parses the wide "code+description under a category banner" catalog into the
+  `account` map (descriptions + categories); `category_of(code)` resolves it.
+- **Purpose detection** (`core/semantic.py` `_detect_purpose`): the engine sums the
+  decoded account categories (money-weighted) to infer what the workbook is ABOUT
+  — REVENUE vs EXPENSES — sets `SemanticModel.purpose`/`purpose_kind`, re-tags the
+  money measures to that nature, and the Insights sheet states it ("this looks
+  like a REVENUE report"). Applies to Auto and Custom.
+- **Decoded descriptions everywhere** (`core/decode.py` `friendly_name`): all sheets
+  show the glossary meaning of a header (`ACTTNUMB` → "Department Account Name")
+  and decode codes to names; the raw CODE column is dropped from groupings
+  (`is_decoded_helper`/`decoded_helper` aware) in insights, smart tables, exec.
+- **Revenue sign reversal** (`pipeline._apply_revenue_sign`): Lebanese revenue books
+  store amounts NEGATIVE. For a revenue purpose, LBP money columns are flipped to
+  POSITIVE in-memory (openpyxl sheets) and via a HIDDEN positive helper column
+  `"<col> (+)"` that the COM pivots aggregate (so SUM/AVG/MIN/MAX are correct);
+  originals are untouched. USD/$ columns are detected and left positive.
+- **USD detection**: if the sheet already has a USD/$ value column, the dollar
+  prompt is skipped and no extra dollar column/calc is added (`pipeline` + UI).
+- **Helpers stay hidden** (`excel_com._hide_helper_columns`): COM re-hides every
+  `… (Name)` / `… (+)` helper after re-saving, fixing a visible-helper bug.
+
+### v1.12.1 — generation-hang fixes (frozen progress bar)
+Two causes of a "stuck loading bar" during Auto-Generate were fixed:
+- **Excel automation now uses `win32com.DispatchEx`** (a SEPARATE, dedicated Excel
+  process) instead of `Dispatch`. Plain `Dispatch` attaches to the user's
+  ALREADY-OPEN Excel; `Visible=False` then hides their window and any modal
+  dialog they (or we) trigger blocks forever — a frozen bar. The isolated
+  instance can't be disturbed by, or disturb, the user's interactive Excel.
+  `Workbooks.Open` also passes `UpdateLinks=0, IgnoreReadOnlyRecommended=True`
+  and we set `AskToUpdateLinks/EnableEvents=False` + `AutomationSecurity=3` so no
+  link-update / macro / read-only prompt can stall the run.
+- **Groq fast-fail.** `GroqNarrator` now uses a short separate CONNECT timeout
+  (`connect_timeout=6s`, read `20s`, `retries=0`) via a `(connect, read)` tuple.
+  A hospital firewall that silently DROPS packets to `api.groq.com` previously
+  stalled the "Building Executive Summary…" stage for up to ~60s; it now falls
+  back to the deterministic summary in ~6s.
 
 ### v1.12.0 — the intelligence layer (semantic read + insight engine + Insights sheet)
 The big upgrade from "aggregates everything" to "reasons about what matters".
