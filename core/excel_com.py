@@ -120,15 +120,6 @@ class ExcelFinalizer:
                 # openpyxl charts and, if the pivots were empty, left the Dashboard
                 # blank. Keeping the openpyxl charts guarantees a populated sheet.
             try:
-                self._conditional_format_tables(excel, wb, skip={src_name},
-                                                skip_sheets=skip_sheets)
-            except Exception:
-                pass
-            try:
-                self._autofit_all(wb, skip_sheets=skip_sheets, data_sheet=data_sheet)
-            except Exception:
-                pass
-            try:
                 self._hide_helper_columns(wb, data_sheet)   # keep helpers hidden
             except Exception:
                 pass
@@ -154,8 +145,19 @@ class ExcelFinalizer:
             except Exception:
                 pass
             try:
+                self._conditional_format_tables(excel, wb, skip={src_name},
+                                                skip_sheets=skip_sheets)
+            except Exception:
+                pass
+            try:
                 self._advanced_cf_tables(excel, wb, skip={src_name},
                                          skip_sheets=skip_sheets)
+            except Exception:
+                pass
+            # AutoFit is the VERY LAST operation before save — ensures all
+            # content (including CF, slicers, styled pivots) is rendered first.
+            try:
+                self._autofit_all(wb, skip_sheets=skip_sheets, data_sheet=data_sheet)
             except Exception:
                 pass
             try:
@@ -574,7 +576,7 @@ class ExcelFinalizer:
     # -- canonical tab order --------------------------------------------------
     def _order_sheets(self, wb) -> None:
         """Sequence the analysis tabs AFTER the data sheet(s):
-        KPI → Pivot → Smart Tables → Insights → Executive Summary → Dashboard.
+        Insights → KPI → Smart Tables → Pivot → Dashboard → Executive Summary.
         Moving each present sheet to the end in this order leaves them in
         sequence at the tail, with the data sheet(s) untouched at the front."""
         from .constants import ordered_output_layout  # noqa: PLC0415

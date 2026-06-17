@@ -70,19 +70,35 @@ def _unique_sheet_name(wb, base: str) -> str:
 _BRAND_BLUE = "0070C0"   # vivid blue for the heading / hospital name
 
 
+def _center_across(ws: Worksheet, row: int, col_start: int, col_end: int,
+                    value, font, fill=None, row_height: Optional[int] = None):
+    """Write a value at (row, col_start) and visually centre it across columns
+    col_start..col_end using 'center across selection' (NOT merge cells)."""
+    from openpyxl.utils import get_column_letter
+    c = ws.cell(row=row, column=col_start, value=value)
+    c.font = font
+    if fill is not None:
+        c.fill = fill
+    c.alignment = Alignment(horizontal="centerContinuous", vertical="center")
+    # Ensure the spanned cells are empty so the text centres correctly.
+    for col_idx in range(col_start + 1, col_end + 1):
+        o = ws.cell(row=row, column=col_idx)
+        if o.value is None:
+            o.value = ""  # empty string so the cell is not None
+    if row_height is not None:
+        ws.row_dimensions[row].height = row_height
+
+
 def _write_heading(ws: Worksheet, spec: SheetSpec, row: int) -> int:
     # Heading text rendered BOLD + BLUE on white (e.g. "SAHEL GENERAL HOSPITAL").
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
-    c = ws.cell(row=row, column=1, value=spec.heading)
-    c.font = Font(name="Calibri", size=20, bold=True, color=_BRAND_BLUE)
-    c.alignment = Alignment(vertical="center", indent=1)
-    ws.row_dimensions[row].height = 32
+    # Using center-across-selection instead of merge cells.
+    _center_across(ws, row, 1, 8, spec.heading,
+                   Font(name="Calibri", size=20, bold=True, color=_BRAND_BLUE),
+                   row_height=32)
     row += 1
     if spec.subheading:
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
-        s = ws.cell(row=row, column=1, value=spec.subheading)
-        s.font = Font(size=11, bold=True, color=_NAVY)
-        s.alignment = Alignment(indent=1)
+        _center_across(ws, row, 1, 8, spec.subheading,
+                       Font(size=11, bold=True, color=_NAVY))
         row += 1
     return row + 1
 
@@ -91,26 +107,21 @@ def _write_kpi_tiles(ws: Worksheet, spec: SheetSpec, row: int) -> int:
     col = 1
     span = 2          # each tile spans 2 columns, 3 rows
     for tile in spec.kpi_tiles:
-        # Label
-        ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + span - 1)
-        lc = ws.cell(row=row, column=col, value=tile.label.upper())
-        lc.font = Font(size=9, bold=True, color=_WHITE)
-        lc.fill = PatternFill("solid", fgColor=_BLUE)
-        lc.alignment = Alignment(horizontal="center", vertical="center")
+        end_col = col + span - 1
+        # Label — center across selection, NOT merge cells
+        _center_across(ws, row, col, end_col, tile.label.upper(),
+                       Font(size=9, bold=True, color=_WHITE),
+                       fill=PatternFill("solid", fgColor=_BLUE))
         # Value
-        ws.merge_cells(start_row=row + 1, start_column=col, end_row=row + 1, end_column=col + span - 1)
-        vc = ws.cell(row=row + 1, column=col, value=tile.value)
-        vc.font = Font(size=16, bold=True, color=_NAVY)
-        vc.fill = PatternFill("solid", fgColor=_LIGHT)
-        vc.alignment = Alignment(horizontal="center", vertical="center")
+        _center_across(ws, row + 1, col, end_col, tile.value,
+                       Font(size=16, bold=True, color=_NAVY),
+                       fill=PatternFill("solid", fgColor=_LIGHT),
+                       row_height=24)
         # Caption
-        ws.merge_cells(start_row=row + 2, start_column=col, end_row=row + 2, end_column=col + span - 1)
         cap_color = _GREY if tile.good is None else (_GREEN if tile.good else _RED)
-        cc = ws.cell(row=row + 2, column=col, value=tile.caption)
-        cc.font = Font(size=9, color=cap_color)
-        cc.fill = PatternFill("solid", fgColor=_LIGHT)
-        cc.alignment = Alignment(horizontal="center", vertical="center")
-        ws.row_dimensions[row + 1].height = 24
+        _center_across(ws, row + 2, col, end_col, tile.caption,
+                       Font(size=9, color=cap_color),
+                       fill=PatternFill("solid", fgColor=_LIGHT))
         col += span
         if col > 8:       # wrap to next tile row after 4 tiles
             col = 1
@@ -278,7 +289,6 @@ def _write_text(ws: Worksheet, block: TextBlock, row: int) -> int:
     row += 1
 
     for para in block.paragraphs:
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
         text = para
         if style == "recommend":
             text = f"➤  {para}"
@@ -291,9 +301,15 @@ def _write_text(ws: Worksheet, block: TextBlock, row: int) -> int:
             font = Font(size=11, bold=True, color=_NAVY)
         else:
             font = Font(size=10, color=_GREY)
-        pc = ws.cell(row=row, column=1, value=text)
-        pc.font = font
-        pc.alignment = Alignment(wrap_text=True, vertical="top")
+        # Center across selection for long text (NOT merge cells).
+        # If text is short enough for one cell, write normally.
+        # Otherwise use center-across-selection spanning cols 1-8.
+        if len(text) > 50:
+            _center_across(ws, row, 1, 8, text, font)
+        else:
+            pc = ws.cell(row=row, column=1, value=text)
+            pc.font = font
+            pc.alignment = Alignment(wrap_text=True, vertical="top")
         ws.row_dimensions[row].height = max(15, 15 * (len(text) // 90 + 1))
         row += 1
     return row + 1
