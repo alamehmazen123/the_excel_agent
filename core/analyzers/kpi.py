@@ -15,10 +15,13 @@ from typing import Optional
 from ..aggregate import group_sum, time_series
 from ..constants import SHEET_KPI
 from ..decode import friendly_name
+from ..derived_metrics import find_applicable_metrics
 from ..formatting import fmt_measure, fmt_number, fmt_percent, is_dollar_column
+from ..library import get_library
 from ..models import ColumnProfile, TableProfile, WorkbookProfile
 from ..render import (ChartKind, ChartSpec, DataTable, KpiTile, NumberFormat,
                       SheetSpec, TextBlock)
+from ..semantic import MetricKind, ReportType, analyze as semantic_analyze
 from .base import Analyzer
 
 _MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -31,6 +34,14 @@ def _month_label(period: str) -> str:
         return f"{_MONTHS[int(m)]}-{y}"
     except Exception:
         return period
+
+_REPORT_LABEL = {
+    ReportType.FINANCIAL: "Financial / GL report",
+    ReportType.RECEIVABLES: "Receivables / ageing report",
+    ReportType.CENSUS: "Admissions / census report",
+    ReportType.OPERATIONS: "Operations / volume report",
+    ReportType.GENERIC: "",
+}
 
 
 class KpiAnalyzer(Analyzer):
@@ -124,21 +135,87 @@ class KpiAnalyzer(Analyzer):
     def _fmt(self, measure) -> NumberFormat:
         return NumberFormat.CURRENCY if is_dollar_column(measure) else NumberFormat.LBP
 
+    # -- type-tailored KPI scorecard (Phase 1.1 + 1.3) ------------------------ #
+    def _scorecard_tailored(self, table, measure, series, report_type) -> list[KpiTile]:
+        """Produce a type-aware scorecard with derived hospital KPIs."""
+        tiles = [KpiTile("Total Records", f"{table.row_count:,}")]
+        if measure is None:
+            return tiles
+
+        total = measure.total or 0.0
+        # Add derived metrics if applicable.
+        if report_type in (ReportType.CENSUS, ReportType.FINANCIAL):
+            sem = semantic_analyze(
+                WorkbookProfile(path="", sheet_names=[table.sheet_name],
+                                tables=[table]),
+                get_library())
+            sem.report_type = report_type
+            dm_results = find_applicable_metrics(sem, table)
+            for dm, avg_val in dm_results[:3]:
+                if dm.unit == "percent":
+                    display = f"{avg_val:.1%}"
+                elif dm.unit == "days":
+                    display = f"{avg_val:.1f} days"
+                elif dm.unit == "currency":
+                    display = f"{avg_val:,.0f} LBP"
+                else:
+                    display = f"{avg_val:.1f}"
+                tiles.append(KpiTile(label=dm.name, value=display,
+                                     caption=dm.description, good=None))
+
+        tiles.append(KpiTile(f"Total {friendly_name(measure.name)}",
+                             fmt_measure(measure, total)))
+        if series:
+            vals = [v for _, v in series]
+            avg = sum(vals) / len(vals)
+            best = max(series, key=lambda kv: kv[1])
+            worst = min(series, key=lambda kv: kv[1])
+            tiles.append(KpiTile("Active Months", f"{len(series)}",
+                                 caption=f"avg {fmt_measure(measure, avg)}/mo"))
+            tiles.append(KpiTile("Best Month", _month_label(best[0]),
+                                 caption=fmt_measure(measure, best[1]), good=True))
+            tiles.append(KpiTile("Lowest Month", _month_label(worst[0]),
+                                 caption=fmt_measure(measure, worst[1]), good=False))
+            if len(series) >= 2:
+                prev, last = vals[-2], vals[-1]
+                mom = (last - prev) / abs(prev) if prev else None
+                if mom is not None:
+                    tiles.append(KpiTile("Month-over-Month",
+                                         f"{'+' if mom >= 0 else ''}{fmt_percent(mom)}",
+                                         caption=f"{_month_label(series[-1][0])} vs prior",
+                                         good=mom >= 0))
+            yearly = defaultdict(float)
+            for p, v in series:
+                yearly[p.split("-")[0]] += v
+            yrs = sorted(yearly)
+            if len(yrs) >= 2:
+                py, cy = yearly[yrs[-2]], yearly[yrs[-1]]
+                yoy = (cy - py) / abs(py) if py else None
+                if yoy is not None:
+                    tiles.append(KpiTile("Year-over-Year",
+                                         f"{'+' if yoy >= 0 else ''}{fmt_percent(yoy)}",
+                                         caption=f"{yrs[-1]} vs {yrs[-2]}", good=yoy >= 0))
+        return tiles
+
     # -- run ----------------------------------------------------------------- #
     def run(self, profile: WorkbookProfile) -> Optional[SheetSpec]:
         table = profile.primary
         if table is None or not table.measures:
             return None
 
+        # Compute semantic model for type awareness.
+        sem = semantic_analyze(profile, get_library())
+
         spec = SheetSpec(
             name=SHEET_KPI, heading="KPI Analysis",
-            subheading=f"Source: {table.sheet_name}  •  {table.row_count:,} records")
+            subheading=f"Source: {table.sheet_name}  •  {table.row_count:,} records"
+                       f"  •  {_REPORT_LABEL.get(sem.report_type, '')}")
 
         measure = self._primary(table, profile)
         date_col = table.date_columns[0] if table.date_columns else None
         series = time_series(table, date_col, measure) if (date_col and measure) else []
 
-        spec.kpi_tiles = self._scorecard(table, measure, series)
+        spec.kpi_tiles = self._scorecard_tailored(table, measure, series, sem.report_type)
 
         # Month-by-month trend table + a trend line chart.
         trend = self._monthly_trend(measure, series) if measure else None

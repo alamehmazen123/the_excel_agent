@@ -178,9 +178,32 @@ def load_workbook_profile(path: str) -> WorkbookProfile:
             "Make sure at least one sheet has a header row and rows of data."
         )
 
-    # Primary table = the one with the most data cells.
+    # Phase 6.3: Budget sheet auto-detection.
+    budget_keywords = ("budget", "plan", "target", "forecast", "planned")
+    for i, t in enumerate(profile.tables):
+        sheet_lower = t.sheet_name.lower()
+        if any(kw in sheet_lower for kw in budget_keywords):
+            profile.budget_sheet = t.sheet_name
+            profile.budget_table_index = i
+            break
+    # If no sheet name matched, check column headers for "budget" keywords.
+    if profile.budget_table_index is None:
+        for i, t in enumerate(profile.tables):
+            for c in t.columns:
+                name_lower = c.name.lower()
+                if any(kw in name_lower for kw in budget_keywords):
+                    profile.budget_sheet = t.sheet_name
+                    profile.budget_table_index = i
+                    break
+            if profile.budget_table_index is not None:
+                break
+
+    # Primary table = the one with the most data cells (skipping budget sheet).
+    candidates = [(i, t) for i, t in enumerate(profile.tables)
+                  if i != profile.budget_table_index]
+    if not candidates:
+        candidates = list(enumerate(profile.tables))
     profile.primary_table_index = max(
-        range(len(profile.tables)),
-        key=lambda i: profile.tables[i].row_count * len(profile.tables[i].columns),
-    )
+        candidates, key=lambda it: it[1].row_count * len(it[1].columns),
+    )[0]
     return profile

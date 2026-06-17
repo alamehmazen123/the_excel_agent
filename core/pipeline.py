@@ -141,6 +141,8 @@ class Engine:
 
         progress(0.05, "Opening workbook…")
         profile = load_workbook_profile(workbook_path)
+        progress(0.10, f"Profiled {len(profile.tables)} sheet(s): " +
+                 ", ".join(t.sheet_name for t in profile.tables[:3]))
 
         # Custom mode: target the chosen sheet and remember the user's measure
         # picks so the KPI/Dashboard/Summary sheets use them too.
@@ -157,7 +159,8 @@ class Engine:
                  if (profile.primary.column(m.name) and
                      profile.primary.column(m.name).is_value)), None)
 
-        progress(0.20, "Detecting tables and column types…")
+        progress(0.20, f"Analysing '{profile.primary.sheet_name if profile.primary else 'data'}' " +
+         f"({profile.primary.row_count if profile.primary else 0:,} rows)")
 
         # Library decoding: detect code columns the reference library can decode
         # and inject hidden decoded-name helper columns so EVERY sheet (tiles,
@@ -199,7 +202,7 @@ class Engine:
         total = len(analyzers)
         for i, analyzer in enumerate(analyzers):
             frac = 0.20 + 0.50 * (i / max(1, total))
-            progress(frac, f"Building {analyzer.sheet_name}…")
+            progress(frac, f"Generating {analyzer.sheet_name} sheet")
             # When Excel is available, real PivotTables are built by the COM
             # finalizer, so skip the static openpyxl pivot sheet.
             if use_com and isinstance(analyzer, PivotAnalyzer):
@@ -220,7 +223,7 @@ class Engine:
                 "workbook's data."
             )
 
-        progress(0.72, "Writing sheets into workbook…")
+        progress(0.72, f"Writing {len(specs)} sheet(s) into workbook")
         inject = (profile.primary, decodes, library) if decodes else None
         vhelpers = (profile.primary, value_helpers) if value_helpers else None
         created = write_results(workbook_path, specs, inject=inject,
@@ -248,9 +251,9 @@ class Engine:
 
         com_pivots = 0
         if use_com:
-            progress(0.86, "Building active pivot tables in Excel…")
             # Build the pivot plan, keeping only pivots whose target sheet exists.
             plan = build_pivot_plan(profile, custom, add_dollar)
+            progress(0.86, f"Building {len(plan)} pivot table(s) in Excel")
             plan = [p for p in plan
                     if (p.target_sheet == SHEET_PIVOT and options.pivot)
                     or (p.target_sheet == SHEET_KPI and options.kpi)]

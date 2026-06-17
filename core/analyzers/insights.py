@@ -17,9 +17,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..aggregate import time_series
+from ..aggregate import group_sum, time_series
 from ..constants import SHEET_INSIGHTS
-from ..formatting import fmt_measure, fmt_number
+from ..derived_metrics import find_applicable_metrics
+from ..decode import friendly_name
+from ..formatting import fmt_measure, fmt_number, fmt_percent, is_dollar_column
 from ..insights import Insight, InsightKind, Severity, detect_insights
 from ..library import get_library
 from ..models import WorkbookProfile
@@ -27,6 +29,16 @@ from ..render import (ChartKind, ChartSpec, DataTable, KpiTile, NumberFormat,
                       SheetSpec, TextBlock)
 from ..semantic import MeasureSemantic, MetricKind, ReportType, SemanticModel, analyze
 from .base import Analyzer
+
+_MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+def _fmt_period(period: str) -> str:
+    try:
+        y, m = period.split("-")
+        return f"{_MONTHS[int(m)]}-{y}"
+    except Exception:
+        return period
 
 _REPORT_LABEL = {
     ReportType.FINANCIAL: "Financial / general-ledger report",
@@ -52,20 +64,139 @@ class InsightsAnalyzer(Analyzer):
         t = profile.primary
         return bool(t and t.row_count > 0 and (t.value_measures or t.percent_measures))
 
-    # -- scorecard ---------------------------------------------------------- #
+    # -- type-tailored scorecard (Phase 1.1) --------------------------------- #
     def _scorecard(self, profile: WorkbookProfile, sem: SemanticModel,
                    insights: list[Insight]) -> list[KpiTile]:
         table = profile.primary
         tiles: list[KpiTile] = []
-
+        report = sem.report_type
         pm = sem.primary_money
+
+        # --- REVENUE / FINANCIAL scorecard ---
+        if report in (ReportType.FINANCIAL, ReportType.GENERIC) and pm is not None:
+            if pm.column.total is not None:
+                tiles.append(KpiTile(
+                    label=f"Total {pm.meaning}",
+                    value=fmt_measure(pm.column, pm.column.total),
+                    caption=f"across {table.row_count:,} records", good=None))
+            # Derived KPIs for revenue books
+            dm_results = find_applicable_metrics(sem, table)
+            for dm, avg_val in dm_results[:2]:
+                tiles.append(KpiTile(
+                    label=dm.name,
+                    value=f"{avg_val:.1f}" if dm.unit == "number" else
+                           f"{avg_val:,.0f} LBP" if dm.unit == "currency" else
+                           f"{avg_val:.1%}" if dm.unit == "percent" else f"{avg_val:.1f}",
+                    caption=dm.description, good=None))
+            # MoM change.
+            var = next((i for i in insights if i.kind == InsightKind.VARIANCE
+                        and i.measure == (pm.name if pm else None)), None)
+            if var is not None:
+                prev = var.evidence.get("prev", 0)
+                last = var.evidence.get("last", 0)
+                pct = abs(last - prev) / abs(prev) * 100 if prev else 0
+                arrow = "▲" if last >= prev else "▼"
+                tiles.append(KpiTile(
+                    label=f"{pm.meaning} MoM",
+                    value=f"{arrow} {pct:.0f}%",
+                    caption=f"{var.period} vs prior month", good=var.good))
+            elif pm is not None:
+                tiles.append(self._trend_tile(table, sem))
+            # Concentration leader.
+            conc = next((i for i in insights if i.kind == InsightKind.CONCENTRATION), None)
+            if conc is not None:
+                tiles.append(KpiTile(
+                    label=f"Top {conc.dimension}",
+                    value=str(conc.evidence.get("leader", "—")),
+                    caption=f"{conc.evidence.get('leader_share', 0) * 100:.0f}% of "
+                            f"{pm.meaning if pm else 'total'}",
+                    good=False if conc.severity == Severity.HIGH else None))
+            return tiles[:4]
+
+        # --- CENSUS / ADMISSIONS scorecard ---
+        if report == ReportType.CENSUS:
+            vols = sem.of_kind(MetricKind.VOLUME)
+            if vols:
+                v = vols[0]
+                if v.column.total is not None:
+                    tiles.append(KpiTile(
+                        label=f"Total {v.meaning}",
+                        value=f"{v.column.total:,.0f}",
+                        caption=f"across {table.row_count:,} records", good=None))
+            if len(vols) >= 2:
+                v2 = vols[1]
+                if v2.column.total is not None:
+                    tiles.append(KpiTile(
+                        label=f"Total {v2.meaning}",
+                        value=f"{v2.column.total:,.0f}",
+                        caption=f"across {table.row_count:,} records", good=None))
+            dm_results = find_applicable_metrics(sem, table)
+            for dm, avg_val in dm_results[:3]:
+                unit_suffix = " days" if dm.unit == "days" else "" if dm.unit == "number" else "%"
+                tiles.append(KpiTile(
+                    label=dm.name,
+                    value=f"{avg_val:.1f}{unit_suffix}",
+                    caption=dm.description, good=None))
+            if not tiles:
+                tiles.append(KpiTile(label="Records", value=f"{table.row_count:,}",
+                                     caption=f"{len(table.columns)} fields", good=None))
+            return tiles[:4]
+
+        # --- RECEIVABLES scorecard ---
+        if report == ReportType.RECEIVABLES:
+            bal = sem.balance
+            if bal is not None and bal.column.total is not None:
+                tiles.append(KpiTile(
+                    label=f"Total {bal.meaning}",
+                    value=fmt_measure(bal.column, bal.column.total),
+                    caption="outstanding balance", good=None))
+            aging = next((i for i in insights if i.kind == InsightKind.AGING), None)
+            if aging is not None:
+                buckets = aging.evidence.get("buckets", {})
+                over90 = buckets.get("90+", 0)
+                total_ar = sum(buckets.values()) or 1
+                tiles.append(KpiTile(
+                    label="90+ day aging",
+                    value=f"{over90 / total_ar * 100:.0f}%",
+                    caption=fmt_measure(bal.column if bal else None, over90) if bal else "",
+                    good=False))
+            dm_results = find_applicable_metrics(sem, table)
+            for dm, avg_val in dm_results[:2]:
+                tiles.append(KpiTile(
+                    label=dm.name,
+                    value=f"{avg_val:.1f}%" if dm.unit == "percent" else f"{avg_val:,.0f}",
+                    caption=dm.description, good=None))
+            if not tiles:
+                tiles.append(KpiTile(label="Records", value=f"{table.row_count:,}",
+                                     caption=f"{len(table.columns)} fields", good=None))
+            return tiles[:4]
+
+        # --- OPERATIONS scorecard ---
+        if report == ReportType.OPERATIONS:
+            vols = sem.of_kind(MetricKind.VOLUME)
+            if vols:
+                v = vols[0]
+                if v.column.total is not None:
+                    tiles.append(KpiTile(
+                        label=f"Total {v.meaning}",
+                        value=f"{v.column.total:,.0f}",
+                        caption=f"across {table.row_count:,} records", good=None))
+            if pm is not None and pm.column.total is not None:
+                tiles.append(KpiTile(
+                    label=f"Total {pm.meaning}",
+                    value=fmt_measure(pm.column, pm.column.total),
+                    caption=None, good=None))
+            if not tiles:
+                tiles.append(KpiTile(label="Records", value=f"{table.row_count:,}",
+                                     caption=f"{len(table.columns)} fields", good=None))
+            return tiles[:4]
+
+        # --- GENERIC fallback ---
         if pm is not None and pm.column.total is not None:
             tiles.append(KpiTile(
                 label=f"Total {pm.meaning}",
                 value=fmt_measure(pm.column, pm.column.total),
                 caption=f"across {table.row_count:,} records", good=None))
-
-        # Month-over-month for the primary money measure (RAG by direction).
         var = next((i for i in insights if i.kind == InsightKind.VARIANCE
                     and i.measure == (pm.name if pm else None)), None)
         if var is not None:
@@ -79,8 +210,6 @@ class InsightsAnalyzer(Analyzer):
                 caption=f"{var.period} vs prior month", good=var.good))
         elif pm is not None:
             tiles.append(self._trend_tile(table, sem))
-
-        # Concentration leader.
         conc = next((i for i in insights if i.kind == InsightKind.CONCENTRATION), None)
         if conc is not None:
             tiles.append(KpiTile(
@@ -89,8 +218,6 @@ class InsightsAnalyzer(Analyzer):
                 caption=f"{conc.evidence.get('leader_share', 0) * 100:.0f}% of "
                         f"{sem.primary_money.meaning if sem.primary_money else 'total'}",
                 good=False if conc.severity == Severity.HIGH else None))
-
-        # Ageing (receivables) OR record-count fallback.
         aging = next((i for i in insights if i.kind == InsightKind.AGING), None)
         if aging is not None:
             buckets = aging.evidence.get("buckets", {})
@@ -206,6 +333,63 @@ class InsightsAnalyzer(Analyzer):
             formats=[NumberFormat.GENERAL, NumberFormat.LBP, NumberFormat.GENERAL],
             bar_columns=[1])
 
+    # -- payer mix analysis (Phase 1.2) ------------------------------------- #
+    def _payer_mix(self, profile: WorkbookProfile, sem: SemanticModel) -> Optional[DataTable]:
+        """When a decodeable payer field exists (FLD1 / guarantor), show a
+        breakdown of revenue by payer with share %."""
+        table = profile.primary
+        if table is None:
+            return None
+        lib = get_library()
+        pm = sem.primary_money
+        if pm is None:
+            return None
+        # Find a decoded payer/guarantor helper column.
+        payer_helper = None
+        for c in table.columns:
+            if c.is_decoded_helper and ("FLD1" in c.name or "fld1" in c.name):
+                payer_helper = c
+                break
+        if payer_helper is None:
+            for c in table.columns:
+                if c.is_decoded_helper:
+                    vals = set()
+                    for r in table.rows:
+                        v = r.get(c.name)
+                        if v and isinstance(v, str) and v.strip():
+                            vals.add(v.strip())
+                            if len(vals) >= 5:
+                                break
+                    payer_keywords = ("insurance", "social security", "army", "private",
+                                      "nssf", "cooperative", "union", "employer")
+                    for v in vals:
+                        vl = v.lower()
+                        if any(k in vl for k in payer_keywords):
+                            payer_helper = c
+                            break
+                if payer_helper is not None:
+                    break
+
+        if payer_helper is None:
+            return None
+
+        ranked = group_sum(table, payer_helper, pm.column, top_n=10)
+        ranked = [(k, v) for k, v in ranked if v > 0]
+        if not ranked:
+            return None
+        total = sum(v for _, v in ranked) or 1.0
+        rows = []
+        for k, v in ranked:
+            share = v / total * 100
+            rows.append([k, round(v, 2), round(share, 1)])
+        return DataTable(
+            title="Revenue by payer / guarantor",
+            headers=[friendly_name(payer_helper.name), f"Total {pm.meaning}", "% of total"],
+            rows=rows,
+            formats=[NumberFormat.GENERAL, NumberFormat.LBP, NumberFormat.GENERAL],
+            bar_columns=[1])
+
+    # -- type-aware data quality (Phase 1.6) --------------------------------- #
     def _data_quality(self, profile: WorkbookProfile, sem: SemanticModel) -> TextBlock:
         import datetime as _dt  # noqa: PLC0415
         table = profile.primary
@@ -218,34 +402,89 @@ class InsightsAnalyzer(Analyzer):
             if dts:
                 lines.append(f"Date range: {min(dts).strftime('%b %Y')} → "
                              f"{max(dts).strftime('%b %Y')}")
+                periods_set = set()
+                for d in dts:
+                    periods_set.add(f"{d.year}-{d.month:02d}")
+                lines.append(f"Periods covered: {len(periods_set)} months")
 
-        # Decode coverage on the account code column (unknown codes stay raw).
-        if sem.account_column:
-            col = table.column(sem.account_column)
-            if col is not None:
-                seen, unknown = set(), set()
+        # Type-aware quality checks.
+        report = sem.report_type
+
+        if report == ReportType.FINANCIAL:
+            # Account code decode coverage.
+            if sem.account_column:
+                col = table.column(sem.account_column)
+                if col is not None:
+                    seen, unknown = set(), set()
+                    for r in table.rows:
+                        v = r.get(col.name)
+                        if v in (None, ""):
+                            continue
+                        k = str(v)
+                        if k in seen:
+                            continue
+                        seen.add(k)
+                        name = lib.decode("account", v)
+                        if name == k:
+                            unknown.add(k)
+                    total = len(seen)
+                    known = total - len(unknown)
+                    pct = (known / total * 100) if total else 100
+                    lines.append(f"Account codes decoded: {known}/{total} ({pct:.0f}%).")
+                    if unknown:
+                        sample = ", ".join(sorted(unknown)[:8])
+                        lines.append(f"⚠ {len(unknown)} unrecognised code(s): {sample}"
+                                     + (" …" if len(unknown) > 8 else "")
+                                     + ". Send these to extend the library.")
+            # Check for negative values in revenue.
+            rev = sem.revenue
+            if rev is not None:
+                neg_count = 0
                 for r in table.rows:
-                    v = r.get(col.name)
-                    if v in (None, ""):
-                        continue
-                    k = str(v)
-                    if k in seen:
-                        continue
-                    seen.add(k)
-                    name = lib.decode("account", v)
-                    if name == k:                       # decode returned the raw code
-                        unknown.add(k)
-                total = len(seen)
-                known = total - len(unknown)
-                pct = (known / total * 100) if total else 100
-                lines.append(f"Account codes decoded: {known}/{total} "
-                             f"({pct:.0f}%).")
-                if unknown:
-                    sample = ", ".join(sorted(unknown)[:8])
-                    lines.append(f"{len(unknown)} code(s) not in the library "
-                                 f"(shown as raw numbers): {sample}"
-                                 + (" …" if len(unknown) > 8 else "")
-                                 + ". Send these to extend the library.")
+                    v = r.get(rev.name)
+                    if isinstance(v, (int, float)) and v < 0:
+                        neg_count += 1
+                if neg_count:
+                    lines.append(f"⚠ {neg_count} negative revenue record(s) "
+                                 f"({neg_count / max(1, table.row_count) * 100:.0f}%) "
+                                 "— revenue sign convention is applied.")
+
+        elif report == ReportType.CENSUS:
+            if table.date_columns:
+                dates_only = sorted([d for d in dates if isinstance(d, (_dt.date, _dt.datetime))])
+                if len(dates_only) >= 2:
+                    min_d, max_d = min(dates_only), max(dates_only)
+                    expected_months = ((max_d.year - min_d.year) * 12 +
+                                       (max_d.month - min_d.month) + 1)
+                    if len(periods_set) < expected_months:
+                        missing = expected_months - len(periods_set)
+                        lines.append(f"⚠ {missing} missing month(s) of data "
+                                     f"({len(periods_set)}/{expected_months} months present).")
+
+        elif report == ReportType.RECEIVABLES:
+            payer_col = next((c for c in table.dimensions
+                              if any(k in c.name.lower() for k in
+                                     ("payer", "guarantor", "insurance", "fld1"))), None)
+            if payer_col:
+                missing = sum(1 for r in table.rows if r.get(payer_col.name) in (None, ""))
+                if missing:
+                    lines.append(f"⚠ {missing} record(s) missing payer code "
+                                 f"({missing / max(1, table.row_count) * 100:.0f}%).")
+
+        elif report == ReportType.OPERATIONS:
+            if table.date_columns and sem.of_kind(MetricKind.VOLUME):
+                vol = sem.of_kind(MetricKind.VOLUME)[0]
+                series = time_series(table, table.date_columns[0], vol.column)
+                if len(series) >= 3:
+                    vals = [v for _, v in series]
+                    avg_v = sum(vals) / len(vals)
+                    max_v = max(vals)
+                    min_v = min(vals)
+                    if avg_v > 0:
+                        lines.append(f"Volume range: {min_v:,.0f} – {max_v:,.0f} "
+                                     f"(avg {avg_v:,.0f}/month)")
+
+        lines.append(f"Detected type: {_REPORT_LABEL.get(report, 'Data report')}")
         return TextBlock("Data quality", lines, style="normal")
 
     # -- run ---------------------------------------------------------------- #
@@ -322,6 +561,11 @@ class InsightsAnalyzer(Analyzer):
                          NumberFormat.GENERAL, NumberFormat.INTEGER],
                 bar_columns=[3],          # data bar on the Impact score
             ))
+
+        # Payer mix analysis (Phase 1.2) — when a decodeable payer field exists.
+        payer = self._payer_mix(profile, sem)
+        if payer is not None:
+            spec.tables.append(payer)
 
         # Account-category roll-up (revenues vs expense categories) from the
         # library categories — a quick P&L-style view.

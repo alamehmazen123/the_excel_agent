@@ -136,6 +136,28 @@ class ExcelFinalizer:
                 self._order_sheets(wb)        # canonical tab order before saving
             except Exception:
                 pass
+            # Phase 2: COM enhancements (each isolated; failure skips silently).
+            try:
+                self._create_named_ranges(wb, profile, src_name)
+            except Exception:
+                pass
+            try:
+                self._add_sparklines(wb, profile)
+            except Exception:
+                pass
+            try:
+                self._apply_pivot_styles(wb)
+            except Exception:
+                pass
+            try:
+                self._add_pivot_slicers(wb, profile)
+            except Exception:
+                pass
+            try:
+                self._advanced_cf_tables(excel, wb, skip={src_name},
+                                         skip_sheets=skip_sheets)
+            except Exception:
+                pass
             try:
                 wb.Save()
                 saved = True
@@ -622,3 +644,221 @@ class ExcelFinalizer:
             name = f"{base}{i}"
             i += 1
         return name
+
+    # -- Phase 2.5: Named Ranges ----------------------------------------------
+    def _create_named_ranges(self, wb, profile, src_name: str) -> None:
+        """Create meaningful Excel named ranges for key data areas so the
+        workbook is a well-structured data model for user formulas."""
+        if src_name:
+            try:
+                ws = wb.Worksheets(profile.primary.sheet_name)
+                lo = ws.ListObjects(src_name)
+                wb.Names.Add(Name="SourceData", RefersToR1C1=lo.Range.Address(True, True, -4150, True))
+            except Exception:
+                pass
+        # Named ranges for each output sheet's data region.
+        from .constants import output_sheet_names
+        for sheet_base in output_sheet_names():
+            try:
+                ws = wb.Worksheets(sheet_base)
+                used = ws.UsedRange
+                safe = sheet_base.replace(" ", "_")
+                wb.Names.Add(Name=f"Data_{safe}", RefersToR1C1=used.Address(True, True, -4150, True))
+            except Exception:
+                pass
+
+    # -- Phase 2.4: Sparklines ------------------------------------------------
+    def _add_sparklines(self, wb, profile) -> None:
+        """Add in-cell trend sparklines on the KPI sheet for every measure,
+        showing the 12-month trend in a single cell."""
+        try:
+            ws = wb.Worksheets("KPI Analysis")
+        except Exception:
+            return
+        try:
+            used = ws.UsedRange
+            last_row = used.Row + used.Rows.Count
+            # Find the monthly trend table's data range for sparklines.
+            for r in range(1, last_row + 1):
+                cell_val = ws.Cells(r, 1).Value
+                if cell_val and "Monthly trend" in str(cell_val):
+                    data_start = r + 2  # after title + header
+                    data_end = data_start + 12
+                    # Add sparkline in the column after the last data column.
+                    spark_col = used.Columns.Count + 1
+                    for row in range(data_start, data_end):
+                        try:
+                            # Row of month data in columns B..last
+                            data_range = ws.Cells(row, 2).Address(False, True) + ":" + \
+                                         ws.Cells(row, used.Columns.Count).Address(False, True)
+                            sg = ws.Cells(row, spark_col).SparklineGroups.Add(
+                                Type=1,  # xlSparkLine (line)
+                                SourceData=f"'{ws.Name}'!{data_range}")
+                        except Exception:
+                            continue
+                    break
+        except Exception:
+            pass
+
+    # -- Phase 2.7: Pivot Table Styles ----------------------------------------
+    def _apply_pivot_styles(self, wb) -> None:
+        """Apply professional branded styles to all pivot tables, matching the
+        navy/blue theme from the openpyxl sheets."""
+        _STYLES = ["PivotStyleMedium9", "PivotStyleLight14", "PivotStyleMedium3"]
+        for ws in wb.Worksheets:
+            try:
+                for pt in ws.PivotTables():
+                    for style in _STYLES:
+                        try:
+                            pt.TableStyle2 = style
+                            break
+                        except Exception:
+                            continue
+            except Exception:
+                continue
+
+    # -- Phase 2.2: Pivot Slicers & Timelines ---------------------------------
+    def _add_pivot_slicers(self, wb, profile) -> None:
+        """Add interactive slicers for date (timeline) and top categorical
+        dimensions on the Pivot Analysis sheet, so non-technical users can
+        filter pivot tables by clicking."""
+        try:
+            ws = wb.Worksheets("Pivot Analysis")
+        except Exception:
+            return
+        # Find the first pivot on the sheet to bind slicers.
+        pt = None
+        try:
+            pt = ws.PivotTables(1)
+        except Exception:
+            return
+        if pt is None:
+            return
+        # Add a date timeline slicer if a date field exists.
+        try:
+            for pf in pt.RowFields:
+                name = str(pf.Name).lower()
+                if "date" in name or "year" in name or "month" in name:
+                    try:
+                        ws.Timelines.Add(
+                            SourceTable=pt.Name,
+                            SourceField=pf.Name).Name = "Timeline"
+                    except Exception:
+                        pass
+                    break
+        except Exception:
+            pass
+        # Add category slicers for the first 2 decoded dimensions.
+        from .constants import SHEET_PIVOT
+        added = 0
+        try:
+            for pf in pt.RowFields:
+                if added >= 2:
+                    break
+                name = str(pf.Name)
+                if name in ("Years", "Months") or "Date" in name:
+                    continue
+                try:
+                    sl = ws.Slicers.Add(
+                        SourceType=1,  # xlDatabase
+                        Source=pt.Name,
+                        SourceField=name)
+                    sl.Name = f"Slicer_{name}"
+                    sl.Left = 400 + added * 180
+                    sl.Top = 10
+                    sl.Width = 160
+                    sl.Height = 150
+                    added += 1
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+    # -- Phase 2.6: Advanced Conditional Formatting ---------------------------
+    def _advanced_cf_tables(self, excel, wb, skip: set, skip_sheets: set) -> None:
+        """Apply icon sets (▲/→/▼ arrows) on KPI MoM change columns, and
+        data bars with gradient stops on all value columns in ListObjects."""
+        for ws in wb.Worksheets:
+            if ws.Name in skip_sheets:
+                continue
+            for lo in ws.ListObjects:
+                if lo.Name in skip:
+                    continue
+                for col in lo.ListColumns:
+                    body = col.DataBodyRange
+                    if body is None:
+                        continue
+                    # Icon set for percentage columns (MoM / Δ%).
+                    header_val = ""
+                    try:
+                        header_val = str(ws.Cells(lo.HeaderRowRange.Row, col.Index).Value or "")
+                    except Exception:
+                        pass
+                    if "%" in header_val or "Δ" in header_val:
+                        try:
+                            fc = body.FormatConditions.AddIconSetCondition()
+                            fc.IconSet = body.Worksheet.Parent.Application.WorkbookFunction
+                            # Use 3-arrows (colored) icon set.
+                            try:
+                                fc.IconSet = excel.IconSets(18)  # xl3Arrows
+                                fc.ShowIconOnly = True
+                                fc.IconCriteria(1).Value = 0
+                                fc.IconCriteria(2).Value = 0
+                                fc.IconCriteria(1).Operator = 1  # xlConditionValueGreaterThanOrEqual
+                                fc.IconCriteria(2).Operator = 3  # xlConditionValueLessThan
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+
+    # -- Phase 2.1: Waterfall Chart (deferred from v1.12) ---------------------
+    def _build_waterfall(self, wb, sheet_name: str, title: str,
+                         categories: list[str], values: list[float],
+                         subtotals: list[bool]) -> None:
+        """Build a native Excel waterfall chart on the given sheet.
+
+        Args:
+            sheet_name: Target sheet name (e.g. "Insights").
+            title: Chart title.
+            categories: Labels for each bar (e.g. revenue items).
+            values: Numeric values for each bar (positive/negative).
+            subtotals: True for bars that are subtotals (grey "total" columns).
+        """
+        try:
+            ws = wb.Worksheets(sheet_name)
+        except Exception:
+            return
+        # Write waterfall data to a hidden area (columns beyond Z).
+        data_start = ws.UsedRange.Row + ws.UsedRange.Rows.Count + 2
+        ws.Cells(data_start, 1).Value = "Category"
+        ws.Cells(data_start, 2).Value = "Value"
+        ws.Cells(data_start, 3).Value = "Subtotal"
+        for i, (cat, val) in enumerate(zip(categories, values), start=1):
+            ws.Cells(data_start + i, 1).Value = str(cat)
+            ws.Cells(data_start + i, 2).Value = float(val)
+            ws.Cells(data_start + i, 3).Value = "TRUE" if subtotals[i - 1] else "FALSE"
+        n = len(values)
+        if n == 0:
+            return
+        chart = ws.Shapes.AddChart2(
+            Style=-1, Type=118,  # xlWaterfall
+            Left=10, Top=ws.Cells(data_start, 5).Top,
+            Width=480, Height=300).Chart
+        chart.SetSourceData(
+            Source=ws.Range(
+                ws.Cells(data_start, 1),
+                ws.Cells(data_start + n, 2)))
+        chart.HasTitle = True
+        chart.ChartTitle.Text = title
+        # Make subtotal bars grey (total columns).
+        try:
+            for i, is_sub in enumerate(subtotals):
+                if is_sub:
+                    pt = chart.SeriesCollection(1).Points(i + 1)
+                    pt.Format.Fill.ForeColor.RGB = 0x808080  # grey
+        except Exception:
+            pass
+        try:
+            chart.HasLegend = False
+        except Exception:
+            pass

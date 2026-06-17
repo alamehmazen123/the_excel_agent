@@ -13,8 +13,10 @@ from typing import Any, Callable, Optional
 from ..aggregate import group_sum, period_over_period_growth, time_series
 from ..constants import SHEET_SUMMARY
 from ..formatting import fmt_measure
+from ..library import get_library
 from ..models import ColumnProfile, ColumnType, TableProfile, WorkbookProfile
 from ..render import SheetSpec, TextBlock
+from ..semantic import MetricKind, ReportType, analyze as semantic_analyze
 from .base import Analyzer
 
 Narrator = Callable[[dict[str, Any]], Optional[str]]
@@ -47,6 +49,7 @@ class ExecutiveSummaryAnalyzer(Analyzer):
         self._narrator = narrator
         self.used_llm = False
         self.note: Optional[str] = None
+        self._sem = None
 
     def applies_to(self, profile: WorkbookProfile) -> bool:
         return profile.primary is not None and profile.primary.row_count > 0
@@ -54,10 +57,14 @@ class ExecutiveSummaryAnalyzer(Analyzer):
     # -- metrics --------------------------------------------------------------
     def build_metrics(self, profile: WorkbookProfile) -> dict[str, Any]:
         table = profile.primary
+        # Compute semantic model for type-tailored narrative.
+        self._sem = semantic_analyze(profile, get_library())
         metrics: dict[str, Any] = {
             "source_sheet": table.sheet_name,
             "record_count": table.row_count,
             "column_count": len(table.columns),
+            "report_type": self._sem.report_type.value if self._sem else "generic",
+            "report_purpose": self._sem.purpose or "",
             "measures": [],
             "breakdowns": [],
         }
@@ -148,19 +155,43 @@ class ExecutiveSummaryAnalyzer(Analyzer):
                     }
         return metrics
 
-    # -- deterministic briefing (offline fallback) ----------------------------
+    # -- type-tailored deterministic briefing (Phase 1.5) ---------------------
     def _deterministic(self, metrics: dict[str, Any]) -> dict[str, Any]:
         ms = metrics["measures"]
         bds = metrics.get("breakdowns", [])
         pm = ms[0] if ms else None
+        report_type = metrics.get("report_type", "generic")
+        purpose = metrics.get("report_purpose", "")
         out: dict[str, Any] = {"headline": "", "overview": "", "findings": [],
                                "risks": [], "opportunities": [], "actions": []}
 
-        if pm:
+        # Type-tailored headline.
+        if report_type == "census":
+            vol_label = pm["name"] if pm else "Volume"
+            out["headline"] = (
+                f"This {'admissions' if 'admission' in vol_label.lower() else 'census'} "
+                f"report covers {metrics['record_count']:,} records. "
+                + (f"Total {pm['name']}: {pm['total_display']}."
+                   if pm else ""))
+        elif report_type == "receivables":
+            out["headline"] = (
+                f"Receivables analysis across {metrics['record_count']:,} records."
+                + (f" Total outstanding: {pm['total_display']}." if pm else ""))
+        elif purpose:
+            out["headline"] = (
+                f"{purpose} report: {pm['name'] if pm else 'Total'} is "
+                f"{pm['total_display'] if pm else 'N/A'} "
+                f"across {metrics['record_count']:,} records.")
+        elif pm:
             out["headline"] = (f"{pm['name']} totals {pm['total_display']} "
                                f"across {metrics['record_count']:,} records.")
+        else:
+            out["headline"] = f"Analysis of {metrics['record_count']:,} records."
+
+        # Type-tailored overview.
+        type_label = report_type.replace("_", " ").title() if report_type != "generic" else "Data"
         out["overview"] = (
-            f"This briefing covers {metrics['record_count']:,} records and "
+            f"This {type_label} briefing covers {metrics['record_count']:,} records and "
             f"{metrics['column_count']} fields from '{metrics['source_sheet']}'. "
             + (f"The primary measure, {pm['name']}, totals {pm['total_display']} "
                f"(avg {pm['average_display']}, range {pm['min_display']}–{pm['max_display']})."

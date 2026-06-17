@@ -19,7 +19,98 @@ Summary, Smart Tables** — to the *same* workbook, leaving the original data sh
   built by automating Excel via COM). Without Excel it falls back to static tables.
 - The user must never see Python, a terminal, PowerShell, or a config file.
 
-Current version is in `config.py` → `APP_VERSION` (currently `1.14.5`).
+Current version is in `config.py` → `APP_VERSION` (currently `1.15.0`).
+
+### v1.15.0 — major upgrade: type-tailored intelligence, COM superpowers, quarterly analytics, period discovery
+
+**Phase 1 — Healthcare-Specific Intelligence (Auto-Adaptive):**
+- **Type-tailored KPI scorecard** (`core/analyzers/insights.py`): the Insights
+  sheet now produces different scorecards depending on detected report type —
+  REVENUE (Total Revenue, MoM, Top Payer %), CENSUS (Admissions, ALOS, Occupancy),
+  RECEIVABLES (Total AR, 90+ day aging, Collection Rate), OPERATIONS (Volume).
+- **Derived hospital KPIs** (`core/derived_metrics.py`): auto-computed metrics
+  (Occupancy Rate, ALOS, Revenue per Patient, Cost per Case, Bad Debt Ratio,
+  Collection Rate, Bed Turnover) when the right columns exist. Appear as tiles
+  on Insights and KPI sheets.
+- **Payer mix analysis** (`core/analyzers/insights.py`): when a decoded payer
+  field (FLD1/guarantor) exists, shows revenue breakdown by payer with % share.
+- **Type-tailored narrative** (`core/analyzers/executive_summary.py`): the
+  deterministic briefing now uses language appropriate to the detected report
+  type (census → admissions language, receivables → aging language).
+- **Type-aware data quality** (`core/analyzers/insights.py`): the data quality
+  panel adapts — revenue checks account code coverage, census checks date
+  continuity, receivables checks missing payer codes, operations checks volume range.
+
+**Phase 2 — Excel COM Expertise:**
+- **Named ranges** (`core/excel_com.py`): creates `SourceData` and `Data_*`
+  named ranges for every output sheet so the workbook is a proper data model.
+- **Sparklines** (`core/excel_com.py`): in-cell trend mini-charts on the KPI
+  sheet next to the monthly trend table.
+- **Pivot table styles** (`core/excel_com.py`): branded navy/blue pivot styles
+  matching the openpyxl theme.
+- **Pivot slicers & timelines** (`core/excel_com.py`): interactive date timeline
+  and category slicers on the Pivot Analysis sheet for non-technical users.
+- **Advanced conditional formatting** (`core/excel_com.py`): icon sets (3-arrows)
+  on percentage/Δ% columns in ListObjects.
+- **Waterfall chart** (`core/excel_com.py`): native Excel waterfall charts
+  (deferred from v1.12) with subtotal support, for revenue bridges & P&L walks.
+
+**Phase 3 — Data Quality & Integrity:**
+- **Duplicate record detection** (`core/insights/engine.py`): new
+  `_duplicates` detector scans key columns (ID, patient, invoice) for duplicate
+  values and estimates $ impact. Surfaces as `InsightKind.DUPLICATE`.
+- **Date continuity & gap analysis** (`core/insights/engine.py`): new
+  `_date_gaps` detector finds gaps in the date timeline. Integrates with
+  `KNOWN_EVENTS` — gaps overlapping the 2024/2026 war crisis closures are
+  EXPLAINED ("gap matches the closure"), not flagged as errors.
+- **Cross-column validation** (`core/insights/engine.py`): new `_validation`
+  detector flags discharge-before-admission dates, negative quantities,
+  zero-price items, and other data inconsistencies.
+- **Per-dimension outliers** (`core/insights/engine.py`): new
+  `_per_dim_outliers` detects when one dimension value (e.g. one department)
+  is far from its normal level using robust z-scores.
+- **Library extension export** (`core/analyzers/insights.py`): unknown codes
+  are now exported to `unknown_codes_<column>.txt` for easy library extension.
+- New `InsightKind` values: `DUPLICATE`, `DATE_GAP`, `VALIDATION`,
+  `PER_DIM_OUTLIER`, `QOQ_VARIANCE`.
+
+**Phase 4 — Quarter-Native Analytics:**
+- **Quarter period key** (`core/aggregate.py`): new `_quarter_key` function
+  buckets dates into `YYYY-QQ` format.
+- **Half-year period key** (`core/aggregate.py`): new `_halfyear_key` function
+  for `YYYY-H1`/`YYYY-H2` buckets.
+- **Granularity-aware time_series** (`core/aggregate.py`): `time_series` now
+  accepts `granularity="month"|"quarter"|"halfyear"|"auto"`. `auto` picks
+  quarter-level when data spans >18 months.
+- **QoQ variance detector** (`core/insights/engine.py`): new `_qoq_variance`
+  detector finds quarter-over-quarter changes for money measures, surfaced as
+  `InsightKind.QOQ_VARIANCE`.
+
+**Phase 5 — Auto-Discovery of Date Periods:**
+- **Period discovery engine** (`core/periods.py`): new module. `discover_periods()`
+  scans the date column and returns a `PeriodDiscovery` with months, quarters,
+  half-years, years, gaps (with known-event awareness), suggested focus periods
+  (last 12M, latest quarter, YTD), and suggested compare periods (previous
+  period, previous quarter, same period last year).
+- **Period-aware AnalysisOptions** (`core/models.py`): `AnalysisOptions` now
+  carries optional `focus_period` and `compare_period` fields for
+  comparison-framed analysis.
+
+**Phase 6 — Model & Architecture Upgrades:**
+- **Multi-sheet processing support** (`core/models.py`): `WorkbookProfile`
+  now has `process_all_tables`, `budget_sheet`, `budget_table_index`, and
+  `all_data_tables` for multi-table analysis.
+- **Budget sheet auto-detection** (`core/loader.py`): sheets named "Budget",
+  "Plan", "Target", or columns with budget keywords are auto-detected and
+  excluded from primary table selection.
+- **Forecast horizon selection** (`core/insights/engine.py`): the trend
+  detector supports configurable `_trend.forecast_horizon` (default: 1 period).
+
+**Phase 7 — Quick Wins:**
+- **Progress messages with sheet names** (`core/pipeline.py`): progress
+  callbacks now include sheet names, row counts, and specific step details.
+- **Export unknown codes** (`core/analyzers/insights.py`): unrecognised
+  account codes are written to `unknown_codes_<column>.txt`.
 
 ### v1.14.5 — second known event (2024 closure)
 - `core/context.py` `KNOWN_EVENTS` now also carries the **2024 closure (war
@@ -161,11 +252,14 @@ Three new pure-`core/` layers feed a new headline sheet:
   returns ranked, typed `Insight` objects from explainable statistics — NO
   training data, runs offline on one workbook: period-over-period **variance**
   (with the top driver), Pareto **concentration**, MAD/z-score **anomaly**,
-  least-squares **trend + one-step forecast**, receivables **ageing** buckets
-  (0–30/31–60/61–90/90+), and negative-record **losses**. Each carries a
-  `Severity` (HIGH/WATCH/INFO), a 0–1 `score`, `good` (RAG), and `evidence`
-  (driver, buckets, items, series) used to build charts. Detectors are wrapped so
-  one failure can't sink the run; findings are de-duped and severity-ranked.
+  least-squares **trend + one-step forecast** (configurable horizon), receivables
+  **ageing** buckets (0–30/31–60/61–90/90+), negative-record **losses**, QoQ
+  **variance**, **duplicate** record detection, **date gap** analysis (with
+  known-event integration), **cross-column validation**, and **per-dimension
+  outlier** detection. Each carries a `Severity` (HIGH/WATCH/INFO), a 0–1
+  `score`, `good` (RAG), and `evidence` (driver, buckets, items, series) used to
+  build charts. Detectors are wrapped so one failure can't sink the run; findings
+  are de-duped and severity-ranked.
 - **Insights sheet (`core/analyzers/insights.py`, `SHEET_INSIGHTS`).** The new
   FIRST tab (`writer._move_insights_first` moves it to index 0). Renders a RAG
   **KPI scorecard**, a **Bottom Line**, ranked **"What to look at"**, amber
@@ -251,17 +345,20 @@ the_excel_agent/
 │   ├── pivot_detect.py      # detect sheets that already contain a PivotTable (zip/xml, no Excel)
 │   ├── models.py            # dataclasses: ColumnProfile, TableProfile, WorkbookProfile, AnalysisOptions, CustomSelection, ...
 │   ├── pivot_plan.py        # declarative plan of PivotTables (auto + custom + combinations)
-│   ├── excel_com.py         # ExcelFinalizer: drives Excel via win32com (pivots, CF, sort, charts, save)
+│   ├── excel_com.py         # ExcelFinalizer: drives Excel via win32com (pivots, CF, sort, charts, save, named ranges, sparklines, slicers, waterfall)
 │   ├── writer.py            # openpyxl renderer for KPI/Dashboard/Exec sheets (+ static fallback)
 │   ├── render.py            # framework-free SheetSpec/DataTable/ChartSpec/KpiTile/TextBlock
-│   ├── aggregate.py         # group_sum, time_series, period_over_period_growth
+│   ├── aggregate.py         # group_sum, time_series (now granularity-aware), period_over_period_growth, quarter/half-year keys
 │   ├── formatting.py        # human value formatting
 │   ├── constants.py         # output sheet names
 │   ├── updater.py           # GitHub-release update check + silent installer launch
+│   ├── derived_metrics.py   # Auto-computed hospital KPIs (ALOS, Occupancy, Rev/Patient, ...)
+│   ├── periods.py           # Period discovery engine (auto-detect months, quarters, years, gaps)
+│   ├── context.py           # Known events (war crisis closures) for contextual anomaly handling
 │   ├── llm/                 # Groq narrative layer (optional)
 │   │   ├── groq_client.py   # GroqNarrator (OpenAI-compatible, JSON mode, soft-fail)
 │   │   └── prompts.py       # consultant-grade system + JSON-schema user prompt
-│   └── analyzers/           # base.py, kpi.py, pivot.py, dashboard.py, executive_summary.py
+│   ├── analyzers/           # base.py, insights.py, kpi.py, pivot.py, dashboard.py, executive_summary.py, smart_tables.py
 ├── ui/                      # PySide6 front-end
 │   ├── app.py               # QApplication bootstrap, stylesheet, window icon
 │   ├── main_window.py       # main screen, mode buttons, update check, closeEvent (silent update)

@@ -21,6 +21,13 @@ class InsightKind(str, Enum):
     AGING = "aging"                  # receivables/balance ageing buckets
     LOSS = "loss"                    # negative / loss-making records
     LEADER = "leader"                # the top contributor in a dimension
+    # Phase 3: Data Quality
+    DUPLICATE = "duplicate"          # duplicate records detected
+    DATE_GAP = "date_gap"            # gaps in the date timeline
+    VALIDATION = "validation"        # cross-column data inconsistencies
+    PER_DIM_OUTLIER = "per_dim_outlier"  # outlier within a dimension
+    # Phase 4: Quarter-Native
+    QOQ_VARIANCE = "qoq_variance"    # quarter-over-quarter change
 
 
 class Severity(str, Enum):

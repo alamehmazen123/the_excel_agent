@@ -1,9 +1,15 @@
-"""Grouping / aggregation helpers shared by the analyzers."""
+"""Grouping / aggregation helpers shared by the analyzers.
+
+Phase 4 additions: quarter keys (``YYYY-QQ``), half-year keys (``YYYY-H1/H2``),
+and granularity-aware ``time_series`` that can return monthly, quarterly, or
+half-yearly buckets.
+"""
 from __future__ import annotations
 
 import datetime as _dt
+import math
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from .models import ColumnProfile, TableProfile
 
@@ -39,17 +45,69 @@ def _period_key(value: Any) -> Optional[str]:
     return None
 
 
+# -- Phase 4.1 + 4.6: Quarter and half-year period keys ---------------------- #
+def _quarter_key(value: Any) -> Optional[str]:
+    """Bucket a date into 'YYYY-QQ' (e.g. 2026-Q1, 2026-Q2)."""
+    if isinstance(value, _dt.datetime):
+        q = (value.month - 1) // 3 + 1
+        return f"{value.year:04d}-Q{q}"
+    if isinstance(value, _dt.date):
+        q = (value.month - 1) // 3 + 1
+        return f"{value.year:04d}-Q{q}"
+    return None
+
+
+def _halfyear_key(value: Any) -> Optional[str]:
+    """Bucket a date into 'YYYY-H1' or 'YYYY-H2'."""
+    if isinstance(value, _dt.datetime):
+        h = "H1" if value.month <= 6 else "H2"
+        return f"{value.year:04d}-{h}"
+    if isinstance(value, _dt.date):
+        h = "H1" if value.month <= 6 else "H2"
+        return f"{value.year:04d}-{h}"
+    return None
+
+
+Granularity = Literal["month", "quarter", "halfyear", "auto"]
+
+
+def _resolve_granularity(periods: list[str], granularity: Granularity) -> Granularity:
+    """Auto-detect: if data spans >18 months, use quarter-level."""
+    if granularity != "auto":
+        return granularity
+    if len(periods) >= 18:
+        return "quarter"
+    return "month"
+
+
 def time_series(table: TableProfile, date_col: ColumnProfile,
-                measure: ColumnProfile) -> list[tuple[str, float]]:
-    """Sum ``measure`` by month period, sorted chronologically."""
+                measure: ColumnProfile,
+                granularity: Granularity = "month") -> list[tuple[str, float]]:
+    """Sum ``measure`` by period, sorted chronologically.
+
+    Args:
+        granularity: "month" (default), "quarter", "halfyear", or "auto".
+            "auto" picks quarter if data spans >18 months.
+    """
+    key_fn = {"month": _period_key, "quarter": _quarter_key,
+              "halfyear": _halfyear_key}
+    fn = key_fn.get(granularity, _period_key)
     totals: dict[str, float] = defaultdict(float)
+    periods_found: list[str] = []
     for row in table.rows:
-        period = _period_key(row.get(date_col.name))
+        period = fn(row.get(date_col.name))
         val = _num(row.get(measure.name))
         if period is None or val is None:
             continue
         totals[period] += val
-    return sorted(totals.items(), key=lambda kv: kv[0])
+        if period not in totals:
+            periods_found.append(period)
+    result = sorted(totals.items(), key=lambda kv: kv[0])
+
+    # If auto, check if we should switch to quarter.
+    if granularity == "auto" and len(result) >= 18:
+        return time_series(table, date_col, measure, granularity="quarter")
+    return result
 
 
 def group_period_dim(table: TableProfile, date_col: ColumnProfile,

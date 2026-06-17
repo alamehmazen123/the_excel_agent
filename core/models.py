@@ -208,12 +208,34 @@ class WorkbookProfile:
     # Set in Custom mode so the KPI/Dashboard/Summary sheets use the user's picks.
     preferred_value_name: Optional[str] = None
     preferred_measure_names: list[str] = field(default_factory=list)
+    # Phase 6.2: Multi-sheet processing support. When True, the engine processes
+    # ALL data tables, not just the primary one.
+    process_all_tables: bool = False
+    # Phase 6.3: Budget sheet auto-detection. Set during loading when a budget
+    # sheet is found alongside actuals.
+    budget_sheet: Optional[str] = None
+    budget_table_index: Optional[int] = None
 
     @property
     def primary(self) -> Optional[TableProfile]:
         if not self.tables:
             return None
         return self.tables[self.primary_table_index]
+
+    @property
+    def budget_table(self) -> Optional[TableProfile]:
+        """The budget/plan table, if detected."""
+        if self.budget_table_index is not None and self.budget_table_index < len(self.tables):
+            return self.tables[self.budget_table_index]
+        return None
+
+    @property
+    def all_data_tables(self) -> list[TableProfile]:
+        """All non-pivot, non-budget, non-output data tables."""
+        from .constants import output_sheet_names
+        skip = set(output_sheet_names()) | set(self.pivot_sheets)
+        skip.discard(self.budget_sheet) if self.budget_sheet else None
+        return [t for t in self.tables if t.sheet_name not in skip]
 
 
 @dataclass
@@ -240,7 +262,13 @@ class CustomSelection:
 
 @dataclass
 class AnalysisOptions:
-    """Which analyses the user asked for (mirrors the UI checkboxes)."""
+    """Which analyses the user asked for (mirrors the UI checkboxes).
+
+    Phase 5 additions: ``focus_period`` and ``compare_period`` let the user
+    narrow analysis to a specific window (e.g. "last 12 months") and compare
+    against another (e.g. "same period last year"). When set, the insight engine
+    recasts every finding in comparative language.
+    """
     # The Insights sheet is the headline briefing (semantic layer + insight
     # engine). On by default — it's the product's smartest output.
     insights: bool = True
@@ -255,6 +283,10 @@ class AnalysisOptions:
     custom: Optional["CustomSelection"] = None
     # If True, add a USD column (= LBP / 90000) next to each LBP value column.
     add_dollar: bool = False
+
+    # Phase 5: Period comparison options (populated by the period discovery engine).
+    focus_period: Optional[str] = None        # e.g. "last_12_months", "latest_quarter", "ytd"
+    compare_period: Optional[str] = None      # e.g. "prev_period", "prev_quarter", "prev_year"
 
     def any_selected(self) -> bool:
         return any((self.insights, self.dashboard, self.pivot, self.kpi,
