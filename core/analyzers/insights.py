@@ -193,6 +193,61 @@ class InsightsAnalyzer(Analyzer):
                     categories=cats, series_name=pm.meaning, values=vals))
         return charts
 
+    # -- account-category roll-up + data quality ---------------------------- #
+    def _category_table(self, sem: SemanticModel) -> Optional[DataTable]:
+        if not sem.category_totals:
+            return None
+        rows = sorted(sem.category_totals.items(), key=lambda kv: kv[1], reverse=True)
+        total = sum(v for _, v in rows) or 1.0
+        return DataTable(
+            title="By account category (revenues vs expenses)",
+            headers=["Account category", "Total", "% of total"],
+            rows=[[c.title(), round(v, 2), round(v / total * 100, 1)] for c, v in rows],
+            formats=[NumberFormat.GENERAL, NumberFormat.LBP, NumberFormat.GENERAL],
+            bar_columns=[1])
+
+    def _data_quality(self, profile: WorkbookProfile, sem: SemanticModel) -> TextBlock:
+        import datetime as _dt  # noqa: PLC0415
+        table = profile.primary
+        lib = get_library()
+        lines = [f"Records: {table.row_count:,}   ·   Fields: {len(table.columns)}"]
+
+        if table.date_columns:
+            dates = [r.get(table.date_columns[0].name) for r in table.rows]
+            dts = [d for d in dates if isinstance(d, (_dt.date, _dt.datetime))]
+            if dts:
+                lines.append(f"Date range: {min(dts).strftime('%b %Y')} → "
+                             f"{max(dts).strftime('%b %Y')}")
+
+        # Decode coverage on the account code column (unknown codes stay raw).
+        if sem.account_column:
+            col = table.column(sem.account_column)
+            if col is not None:
+                seen, unknown = set(), set()
+                for r in table.rows:
+                    v = r.get(col.name)
+                    if v in (None, ""):
+                        continue
+                    k = str(v)
+                    if k in seen:
+                        continue
+                    seen.add(k)
+                    name = lib.decode("account", v)
+                    if name == k:                       # decode returned the raw code
+                        unknown.add(k)
+                total = len(seen)
+                known = total - len(unknown)
+                pct = (known / total * 100) if total else 100
+                lines.append(f"Account codes decoded: {known}/{total} "
+                             f"({pct:.0f}%).")
+                if unknown:
+                    sample = ", ".join(sorted(unknown)[:8])
+                    lines.append(f"{len(unknown)} code(s) not in the library "
+                                 f"(shown as raw numbers): {sample}"
+                                 + (" …" if len(unknown) > 8 else "")
+                                 + ". Send these to extend the library.")
+        return TextBlock("Data quality", lines, style="normal")
+
     # -- run ---------------------------------------------------------------- #
     def run(self, profile: WorkbookProfile) -> Optional[SheetSpec]:
         table = profile.primary
@@ -224,6 +279,15 @@ class InsightsAnalyzer(Analyzer):
                  f"codes resolve mainly to: {cats}. The analysis below is framed "
                  f"accordingly."],
                 style="highlight"))
+
+        # Known-event context (e.g. the 2026 closure) — explain low figures up front.
+        if table.date_columns and sem.primary_money is not None:
+            from ..context import events_overlapping  # noqa: PLC0415
+            periods = [p for p, _ in time_series(
+                table, table.date_columns[0], sem.primary_money.column)]
+            for ev in events_overlapping(periods):
+                spec.text_blocks.append(TextBlock(
+                    "Important context", [ev.note], style="warn"))
 
         # Bottom line = the single most important finding.
         if insights:
@@ -258,6 +322,15 @@ class InsightsAnalyzer(Analyzer):
                          NumberFormat.GENERAL, NumberFormat.INTEGER],
                 bar_columns=[3],          # data bar on the Impact score
             ))
+
+        # Account-category roll-up (revenues vs expense categories) from the
+        # library categories — a quick P&L-style view.
+        cat = self._category_table(sem)
+        if cat is not None:
+            spec.tables.append(cat)
+
+        # Data-quality panel so the GM can trust the numbers at a glance.
+        spec.text_blocks.append(self._data_quality(profile, sem))
 
         spec.charts = self._charts(table, sem, insights)
 

@@ -16,6 +16,7 @@ from collections import defaultdict
 from typing import Any, Optional
 
 from ..aggregate import _period_key, group_sum, time_series
+from ..context import event_for_period
 from ..formatting import fmt_measure, fmt_number
 from ..models import ColumnProfile, TableProfile, WorkbookProfile
 from ..semantic import MeasureSemantic, MetricKind, ReportType, SemanticModel
@@ -105,10 +106,19 @@ def _variance(table: TableProfile, sem: SemanticModel,
         detail = (f"{ms.meaning} {arrow} {abs(frac) * 100:.0f}% "
                   f"({fmt_measure(ms.column, abs(change))}) in {lp} vs {pp}"
                   f"{f', led by {driver}' if driver else ''}.")
+        score = _clamp01(abs(frac))
+        # If this swing involves a KNOWN closure month, it's expected — explain it
+        # and stop flagging it as an alarming finding.
+        ev = event_for_period(lp) or event_for_period(pp)
+        if ev is not None:
+            detail += f" This reflects the {ev.short}, not an operational problem."
+            sev = Severity.WATCH if sev == Severity.HIGH else sev
+            good = None
+            score *= 0.4
         out.append(Insight(
             kind=InsightKind.VARIANCE, severity=sev,
             title=f"{ms.meaning} {arrow} {abs(frac) * 100:.0f}% month-over-month",
-            detail=detail, score=_clamp01(abs(frac)), good=good,
+            detail=detail, score=score, good=good,
             measure=ms.name, period=lp,
             evidence={"prev": prev, "last": last, "prev_period": pp,
                       "driver": driver},
@@ -203,13 +213,19 @@ def _anomaly(table: TableProfile, sem: SemanticModel,
             continue
         sev = Severity.HIGH if abs(z) >= _ANOM_HIGH else Severity.WATCH
         direction = "above" if z > 0 else "below"
+        detail = (f"{pm.meaning} in {period} ({fmt_measure(pm.column, v)}) sits "
+                  f"{abs(z):.1f}σ {direction} its typical monthly level "
+                  f"({fmt_measure(pm.column, med)}).")
+        score = _clamp01(abs(z) / 5.0)
+        ev = event_for_period(period)
+        if ev is not None:
+            detail += f" This is explained by the {ev.short} — expected, not anomalous."
+            sev = Severity.INFO
+            score *= 0.3
         out.append(Insight(
             kind=InsightKind.ANOMALY, severity=sev,
             title=f"{pm.meaning} in {period} is unusual",
-            detail=(f"{pm.meaning} in {period} ({fmt_measure(pm.column, v)}) sits "
-                    f"{abs(z):.1f}σ {direction} its typical monthly level "
-                    f"({fmt_measure(pm.column, med)})."),
-            score=_clamp01(abs(z) / 5.0), good=None,
+            detail=detail, score=score, good=None,
             measure=pm.name, period=period,
             evidence={"z": z, "median": med, "value": v},
         ))

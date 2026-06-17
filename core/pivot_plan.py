@@ -19,6 +19,7 @@ from typing import Optional
 
 from .aggregate import group_sum
 from .constants import SHEET_KPI, SHEET_PIVOT
+from .decode import friendly_name
 from .models import (ColumnProfile, ColumnType, CustomSelection, TableProfile,
                      WorkbookProfile)
 
@@ -45,6 +46,25 @@ USD_PER_LBP = 90000          # exchange rate: 90,000 LBP = 1 USD
 TOP_N = 20                 # cap for wide dimensions (e.g. TRIGGER DETAIL)
 MAX_DIMS = 8               # don't generate an unbounded number of pivots
 MAX_CROSS_DIMS = 5         # date x dimension combos
+# Plain (undecoded) text columns with more distinct values than this are free
+# text / IDs (DESCRIPTION, PATIENT_NAME …) and make meaningless pivots — skip them.
+MAX_DIM_DISTINCT = 200
+
+
+def _good_dimensions(table: TableProfile) -> list[ColumnProfile]:
+    """The columns worth pivoting BY: decoded-name helpers first (real
+    department/payer/doctor names), then clean categoricals — excluding the raw
+    CODE columns that have a decoded helper, and overly-granular free text/IDs."""
+    helpers = [c for c in table.columns if c.is_decoded_helper]
+    seen = {c.name for c in helpers}
+    plain: list[ColumnProfile] = []
+    for c in table.pivot_dimensions:
+        if c.is_decoded_helper or c.decoded_helper or c.name in seen:
+            continue
+        if c.distinct > MAX_DIM_DISTINCT:
+            continue
+        plain.append(c)
+    return helpers + plain
 
 
 @dataclass
@@ -186,7 +206,7 @@ def build_custom_plan(table: TableProfile, sel: CustomSelection,
         if col is None:
             continue
         fmt, role = _resolve_choice(col, mc.format_kind)
-        resolved.append((col, fmt, role, f"Total {col.name}"))
+        resolved.append((col, fmt, role, f"Total {friendly_name(col.name)}"))
     if not resolved:
         return []
     value_measures = [(c, f, cap) for (c, f, role, cap) in resolved if role == "value"]
@@ -290,7 +310,7 @@ def build_pivot_plan(profile: WorkbookProfile,
 
     value = table.primary_value_measure
     pct = table.percent_measures[0] if table.percent_measures else None
-    dims = table.pivot_dimensions[:MAX_DIMS]
+    dims = _good_dimensions(table)[:MAX_DIMS]
     dates = table.date_columns[:3]
     id_col = table.identifier_column
     count_field = id_col.name if id_col else (
@@ -301,7 +321,7 @@ def build_pivot_plan(profile: WorkbookProfile,
         return []
 
     plan: list[PivotSpec] = []
-    value_caption = f"Total {value.name}" if value else None
+    value_caption = f"Total {friendly_name(value.name)}" if value else None
 
     # --- per-date: trade count + total value, grouped Month + Year -----------
     for d in dates:

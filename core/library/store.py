@@ -49,15 +49,25 @@ def norm_code(value: Any) -> str:
 
 
 def code_variants(value: Any) -> list[str]:
-    """All plausible lookup keys for a code cell (handles 1 == 001 == '001 ')."""
+    """All plausible lookup keys for a code cell (handles 1 == 001 == '001 ' and a
+    trailing currency tag like '2010 USD' == '2010')."""
     base = norm_code(value)
     if not base:
         return []
     variants = {base, base.upper()}
-    # Numeric forms: int(001) -> "1"; also re-pad is impossible without a width,
-    # so we index both literal and stripped-int forms at ingest time instead.
-    if re.fullmatch(r"\d+", base):
-        variants.add(str(int(base)))          # "001" -> "1"
+
+    def _numeric(form: str) -> None:
+        variants.add(form)
+        if re.fullmatch(r"\d+", form):
+            variants.add(str(int(form)))      # "001" -> "1"
+
+    _numeric(base)
+    # Strip a trailing currency tag the data appends to a code, e.g. "2010 USD",
+    # "7002-LBP", "8001 $" -> "2010" / "7002" / "8001", so it still decodes.
+    m = re.match(r"^(.*?)[\s\-_]+(USD|USDT|US\$|LBP|\$|€|£)$", base, re.IGNORECASE)
+    if m and m.group(1).strip():
+        _numeric(m.group(1).strip())
+        _numeric(m.group(1).strip().upper())
     return list(variants)
 
 

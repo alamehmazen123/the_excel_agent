@@ -19,7 +19,49 @@ Summary, Smart Tables** — to the *same* workbook, leaving the original data sh
   built by automating Excel via COM). Without Excel it falls back to static tables.
 - The user must never see Python, a terminal, PowerShell, or a config file.
 
-Current version is in `config.py` → `APP_VERSION` (currently `1.14.1`).
+Current version is in `config.py` → `APP_VERSION` (currently `1.14.5`).
+
+### v1.14.5 — second known event (2024 closure)
+- `core/context.py` `KNOWN_EVENTS` now also carries the **2024 closure (war
+  crisis): 28 Sep 2024 → 26 Nov 2024** (resumed 27 Nov). Both the 2024 and 2026
+  closures are de-alarmed/explained identically. List is intentionally hard-coded.
+
+### v1.14.4 — known-event awareness (2026 closure) + valid Groq key
+- **`core/context.py` `KNOWN_EVENTS`**: a small hard-coded list of real-world
+  events that explain otherwise-alarming numbers. The Sahel **2026 closure (war
+  crisis)** ran **5 Mar 2026 → 16 Apr 2026** (only Emergency / Lab / Radiology /
+  minor OR / limited Dialysis open; resumed 17 Apr). `event_for_period('YYYY-MM')`
+  and `events_overlapping(periods)` expose it.
+- **Insight engine is closure-aware** (`core/insights/engine.py`): a variance or
+  anomaly that falls in a closure month is EXPLAINED ("reflects the 2026 closure
+  …, not an operational problem") and DE-ALARMED — HIGH variance → WATCH, anomaly
+  → INFO, `good=None`, score reduced. The Insights sheet adds an **"Important
+  context"** block describing the closure when the data overlaps it.
+- **v1.14.3 prior**: the bundled Groq key was revoked → "Invalid or unauthorized";
+  replaced with a valid key in `local_secrets.py` (re-stamped into `buildinfo.py`).
+
+### v1.14.2 — pivots fixed (empty / raw-code pivots), category roll-up, data quality
+
+### v1.14.2 — pivots fixed (empty / raw-code pivots), category roll-up, data quality
+The big bug: on a RE-RUN, the source data Table kept its OLD narrow range
+(e.g. `A1:W`), so the engine's injected helper columns (`… (Name)`, `… (+)`) sat
+OUTSIDE the table → never entered the PivotCache → pivots lost their value field
+(came out EMPTY) and could not group by decoded names (fell back to raw columns
+like `Cost`, `DESCRIPTION`, `PATIENT_NAME`).
+- **`excel_com._ensure_source_table` now `lo.Resize(ws.UsedRange)`** on every run,
+  so the table always covers the helper columns. Verified: a pre-existing `A1:F`
+  table is widened to `A1:J`, the cache gains `ORG_AMOUNT (+)` / `ACTTNUMB (Name)`
+  / `FLD1 (Name)`, and pivots group by decoded names with values present.
+- **`pivot_plan._good_dimensions`**: pivots group BY decoded-name helpers first,
+  then clean categoricals — excluding raw code columns that have a decoded helper
+  and overly-granular free text / IDs (`distinct > MAX_DIM_DISTINCT = 200`). No
+  more "by Cost / by patient name" junk pivots.
+- **Friendly pivot captions** via `decode.friendly_name` ("Total Original Amount"
+  not "Total ORG_AMOUNT").
+- **Insights additions**: a "By account category (revenues vs expenses)" roll-up
+  from `SemanticModel.category_totals`, and a **Data quality** panel (records,
+  date range, % of account codes decoded, and a sample of unknown codes to send
+  back to extend the library).
 
 ### v1.14.1 — the "stuck for an hour on 80k rows" hang, fixed for good
 Root causes on a large book (80k+ rows), all in `excel_com.py`:

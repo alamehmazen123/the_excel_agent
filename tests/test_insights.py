@@ -149,6 +149,37 @@ def test_revenue_sign_flip_makes_amounts_positive():
     assert usd.positive_helper is None
 
 
+def test_closure_period_is_explained_not_alarmed():
+    from core.context import event_for_period
+    assert event_for_period("2026-03") and event_for_period("2026-04")
+    assert not event_for_period("2026-05")
+
+    rows = []
+    monthly = {"2026-01": 100, "2026-02": 110, "2026-03": 15, "2026-04": 12,
+               "2026-05": 115, "2026-06": 120}        # deep dip during the closure
+    for per, base in monthly.items():
+        d = _dt.datetime(int(per[:4]), int(per[5:]), 15)
+        for dep in ("Cardiology", "Radiology"):
+            rows.append({"Date": d, "Department": dep, "Revenue": base * 500_000.0})
+    table = TableProfile(
+        sheet_name="GL", header_row=1, first_data_row=2, last_data_row=13,
+        first_col=1, last_col=3, rows=rows,
+        columns=[_col("Date", ColumnType.DATE),
+                 _col("Department", ColumnType.CATEGORICAL, distinct=2, count=12),
+                 _col("Revenue", ColumnType.CURRENCY, number_format='#,##0" LBP"',
+                      count=12, total=sum(r["Revenue"] for r in rows))])
+    profile = WorkbookProfile(path="x.xlsx", sheet_names=["GL"], tables=[table])
+    insights = detect_insights(profile, analyze(profile))
+
+    explained = [i for i in insights if "closure" in i.detail.lower()]
+    assert explained, "a closure-period finding should be explained"
+    # No closure-window finding is left as a red HIGH alarm.
+    for i in insights:
+        if i.period in ("2026-03", "2026-04") and "closure" in i.detail.lower():
+            assert i.severity != Severity.HIGH
+            assert i.good is not True  # never marked as a 'good' surprise either
+
+
 def test_empty_profile_is_safe():
     empty = WorkbookProfile(path="x.xlsx")
     sem = analyze(empty)

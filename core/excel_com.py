@@ -160,8 +160,19 @@ class ExcelFinalizer:
         except Exception:
             return None
         if ws.ListObjects.Count > 0:
-            self.notes.append("Source data was already an Excel Table.")
-            return ws.ListObjects(1)
+            lo = ws.ListObjects(1)
+            # CRITICAL: resize the existing table to the FULL used range. A table
+            # created on a PRIOR run (e.g. before the engine injected the decoded
+            # "… (Name)" and sign-flipped "… (+)" helper columns) stays too narrow,
+            # so those helper columns fall OUTSIDE the table -> they never enter the
+            # PivotCache -> pivots lose their value field (come out EMPTY) and can't
+            # group by decoded names. Widening it every run fixes that for good.
+            try:
+                lo.Resize(ws.UsedRange)
+            except Exception:
+                pass
+            self.notes.append("Reused and widened the source Excel Table.")
+            return lo
         lo = ws.ListObjects.Add(XL_SRC_RANGE, ws.UsedRange, None, XL_YES)
         lo.Name = self._safe_table_name("SourceData", wb)
         lo.TableStyle = "TableStyleMedium2"
