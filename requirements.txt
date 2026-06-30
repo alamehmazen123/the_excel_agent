@@ -1,0 +1,11 @@
+# Runtime
+PySide6>=6.6
+openpyxl>=3.1
+pandas>=2.0
+requests>=2.31
+keyring>=24.0
+pywin32>=306          # Excel COM automation (active pivot tables, etc.)
+
+# Build-time only (creates the single-file .exe)
+pyinstaller>=6.3
+Pillow>=10.0           # app icon generation (tools/make_icon.py)

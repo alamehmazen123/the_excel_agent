@@ -1,0 +1,23 @@
+# --- Secrets (never commit) ---
+local_secrets.py
+
+# --- Build artifacts ---
+build/
+dist/
+Output/
+buildinfo.py
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# --- Test / scratch ---
+tools/_*              # scratch files used during development
+tests/sample*.xlsx
+*.tmp
